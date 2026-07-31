@@ -1,0 +1,9 @@
+.DS_Store
+*.exe
+*.test
+/bin/
+/dist/
+configs/config.local.yaml
+.env
+.idea/
+.vscode/

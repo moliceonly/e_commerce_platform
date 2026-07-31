@@ -1,0 +1,2 @@
+# Copy to config.local.yaml and edit. Prefer env vars in practice.
+# APP_ENV / HTTP_ADDR / MYSQL_DSN / REDIS_ADDR / JWT_SECRET
