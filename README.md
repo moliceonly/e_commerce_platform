@@ -2,18 +2,21 @@
 
 对齐 `go-web-roadmap.html` **Part 03**：简易电商。**空骨架，业务你自己实现。**
 
+- 各阶段要改哪个函数：见 [TODO.md](./TODO.md)
+- 本项目会用到的 Gin API（作用 / 入参 / 返回）：见 [GIN.md](./GIN.md)
+
 ## 你做什么
 
 按阶段把各层 `TODO` 填满；依赖方向：**handler → service → repository**（handler 禁止直连 DB）。
 
-| 阶段 | 目标 |
-|------|------|
-| A · 3.1 | `go run` + `/healthz` + env 配置 + `/api/v1` 分组 |
-| B | 模型 Migrate、商品、加购、事务下单扣库存、订单状态流转 |
-| C · 3.2 | 注册登录 JWT、鉴权中间件、越权校验、binding |
-| D · 3.3 | request_id、分页、优雅停机 |
+| 阶段　　| 目标　　　　　　　　　　　　　　　　　　　　　　　　　　 |
+| ---------| ----------------------------------------------------------|
+| A · 3.1 | `go run` + `/healthz` + env 配置 + `/api/v1` 分组　　　　|
+| B　　　 | 模型 Migrate、商品、加购、事务下单扣库存、订单状态流转　 |
+| C · 3.2 | 注册登录 JWT、鉴权中间件、越权校验、binding　　　　　　　|
+| D · 3.3 | request_id、分页、优雅停机　　　　　　　　　　　　　　　 |
 | E · 3.5 | `scripts/oversell_demo.sh` 复现超卖 → 修 `DeductStockTx` |
-| F | 单测、Dockerfile / compose |
+| F　　　 | 单测、Dockerfile / compose　　　　　　　　　　　　　　　 |
 
 ## 目录
 
