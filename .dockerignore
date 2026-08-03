@@ -1,0 +1,7 @@
+.git
+**/*_test.go.bak
+*.md
+GIN.md
+TODO.md
+scripts/
+deployments/

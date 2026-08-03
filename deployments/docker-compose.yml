@@ -7,7 +7,7 @@ services:
       MYSQL_USER: trainer
       MYSQL_PASSWORD: "Train2026Lib!"
     ports:
-      - "3307:3306"  
+      - "3306:3306"
     command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "6379:6379"
 
   app:
     build:
@@ -31,9 +31,24 @@ services:
       REDIS_ADDR: "redis:6379"
       JWT_SECRET: "compose-dev-secret"
     ports:
-      - "8081:8080"  
+      - "8080:8080"
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # 在容器内跑单测（连 compose 的 mysql）。用法见 README。
+  test:
+    profiles: ["test"]
+    image: golang:1.22-alpine
+    working_dir: /src
+    volumes:
+      - ..:/src
+    environment:
+      GOPROXY: "https://goproxy.cn,direct"
+      MYSQL_DSN: "trainer:Train2026Lib!@tcp(mysql:3306)/training_lib?charset=utf8mb4&parseTime=True&loc=Local"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["go", "test", "./internal/auth/", "./internal/handler/", "./internal/service/", "-count=1", "-v"]

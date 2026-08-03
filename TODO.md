@@ -8,17 +8,17 @@
 
 ## 阶段 A · 3.1 空壳可跑 ✅
 
-| 状态 | 目录 / 符号 | 内容 |
-|------|-------------|------|
-| ✅ | `handler.Healthz` | 探活 |
-| ✅ | `config.Load` | 读 env |
-| ✅ | `response.OK` / `Fail` | 统一响应 |
-| ✅ | `cmd/server/main.go` | MySQL + GORM；组装 repo→svc→`handler.Deps` |
-| ✅ | `repository.ProductRepo.AutoMigrate` | 五张表 |
-| ✅ | `handler.NewRouter` | `/api/v1` + 商品路由 |
-| ✅ | `handler.ProductHandler.Create/Get/List` | → CatalogService |
-| ✅ | `service.CatalogService.*` | → ProductRepo |
-| ✅ | `repository.ProductRepo.Create/Get/List` | GORM CRUD |
+| 状态 | 目录 / 符号　　　　　　　　　　　　　　　| 内容　　　　　　　　　　　　　　　　　　　 |
+| ------| ------------------------------------------| --------------------------------------------|
+| ✅　　| `handler.Healthz`　　　　　　　　　　　　| 探活　　　　　　　　　　　　　　　　　　　 |
+| ✅　　| `config.Load`　　　　　　　　　　　　　　| 读 env　　　　　　　　　　　　　　　　　　 |
+| ✅　　| `response.OK` / `Fail`　　　　　　　　　 | 统一响应　　　　　　　　　　　　　　　　　 |
+| ✅　　| `cmd/server/main.go`　　　　　　　　　　 | MySQL + GORM；组装 repo→svc→`handler.Deps` |
+| ✅　　| `repository.ProductRepo.AutoMigrate`　　 | 五张表　　　　　　　　　　　　　　　　　　 |
+| ✅　　| `handler.NewRouter`　　　　　　　　　　　| `/api/v1` + 商品路由　　　　　　　　　　　 |
+| ✅　　| `handler.ProductHandler.Create/Get/List` | → CatalogService　　　　　　　　　　　　　 |
+| ✅　　| `service.CatalogService.*`　　　　　　　 | → ProductRepo　　　　　　　　　　　　　　　|
+| ✅　　| `repository.ProductRepo.Create/Get/List` | GORM CRUD　　　　　　　　　　　　　　　　　|
 
 ---
 
@@ -73,13 +73,15 @@
 | ✅ | `internal/handler/handler_test.go` | 全路由 httptest（含鉴权链路） |
 | ✅ | `internal/service/service_test.go` | PlaceOrder 成功 / 库存不足回滚 |
 | ✅ | `deployments/Dockerfile` | 多阶段构建 + `GOPROXY` |
-| ✅ | `deployments/docker-compose.yml` | app + mysql + redis；宿主机 8081 / 3307 / 6380 |
-| ✅ | `README.md` | 本地 / Compose / 测试说明 |
+| ✅ | `deployments/docker-compose.yml` | app + mysql + redis；`test` profile |
+| ✅ | `scripts/free_ports.sh` | 释放 8080/3306/6379 等本机占用 |
+| ✅ | `README.md` | **仅 Docker 启动说明** |
 
 ```bash
-go test ./internal/auth/ ./internal/handler/ ./internal/service/ -count=1
+sudo bash scripts/free_ports.sh
 sudo docker compose -f deployments/docker-compose.yml up --build
-curl -i http://127.0.0.1:8081/healthz
+curl -i http://127.0.0.1:8080/healthz
+sudo docker compose -f deployments/docker-compose.yml --profile test run --rm test
 ```
 
 ---
