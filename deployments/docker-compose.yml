@@ -7,7 +7,7 @@ services:
       MYSQL_USER: trainer
       MYSQL_PASSWORD: "Train2026Lib!"
     ports:
-      - "3306:3306"
+      - "3307:3306"  
     command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
 
   app:
     build:
@@ -31,7 +31,7 @@ services:
       REDIS_ADDR: "redis:6379"
       JWT_SECRET: "compose-dev-secret"
     ports:
-      - "8080:8080"
+      - "8081:8080"  
     depends_on:
       mysql:
         condition: service_healthy
