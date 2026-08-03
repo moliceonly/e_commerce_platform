@@ -2,7 +2,7 @@
 
 依赖方向：**handler → service → repository**。勾完一阶段再进下一阶段。
 
-**当前进度：阶段 A、B、C、D（含路线图 3.1 / 3.2 / 3.3）已完成；下一阶段 E（3.5 超卖压测）。**
+**当前进度：阶段 A–E（含路线图 3.1 / 3.2 / 3.3 / 3.5）已完成；最后阶段 F（3.4 测试 + Docker）。**
 
 ---
 
@@ -79,44 +79,67 @@
 
 ---
 
-## 阶段 E · 3.5 超卖 ← 当前
+## 阶段 E · 3.5 超卖 ✅
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
-| ☐ | `scripts/oversell_demo.sh` | 填好 TOKEN / PRODUCT_ID 后并发打 |
-| ⚠️ | `repository.ProductRepo.DeductStockTx` | 已有 `FOR UPDATE`；阶段 E 用脚本压测确认 |
-| ⚠️ | `service.OrderService.PlaceOrder` | 已用同一 `tx`；压测验证不超卖 |
-| ☐ | （可选）对照实验 | 临时去掉锁/条件更新，观察超卖后再改回 |
+| ✅ | `scripts/oversell_demo.sh` | 注册登录 + 建商品 + 并发下单 |
+| ✅ | `repository.ProductRepo.DeductStockTx` | `FOR UPDATE`；压测确认不超卖 |
+| ✅ | `service.OrderService.PlaceOrder` | 同 `tx`；库存与销量一致 |
 
-**验收：** 并发下单后库存与订单数量一致、不超卖。  
-**做法：** 先造低库存商品（如 stock=5），`CONCURRENCY=50` 打 `oversell_demo.sh`，再查：
+**验收：** `stock + sold == 初始库存`，无负数库存。
 
-```sql
-SELECT id, stock FROM products WHERE id = ?;
-SELECT COALESCE(SUM(quantity),0) FROM order_items WHERE product_id = ?;
--- 期望：成功扣减合计 ≤ 初始库存，且 stock + 已售 = 初始库存
+---
+
+## 阶段 F · 测试与 Docker ← 当前（最后阶段）
+
+对应路线图 **3.4**（测试）+ 部署（Dockerfile / compose，与路线图 3.5 后半重叠）。  
+`deployments/Dockerfile`、`docker-compose.yml` **骨架已有**，本阶段目标是跑通并补测试。
+
+| 状态 | 目录 / 符号 | 要做什么 |
+|------|-------------|----------|
+| ☐ | `internal/service/*_test.go`（自建） | 至少测 `PlaceOrder` 或 `DeductStockTx`（成功扣减 / 库存不足失败） |
+| ☐ | `internal/handler/*_test.go`（自建） | `httptest`：`GET /healthz`；可选 Register/Login |
+| ☐ | `deployments/Dockerfile` | 多阶段构建已有；确认 `go build ./cmd/server` 镜像能起 |
+| ☐ | `deployments/docker-compose.yml` | `compose up --build` → app + mysql(+redis) |
+| ☐ | `README.md` | 补 `go test` / `compose` 命令（骨架说明已写） |
+
+### F1 · 单测怎么下手
+
+```bash
+# 建议先从最薄的测起
+go test ./internal/auth/ -v          # Hash/Check、Sign/Parse（可不连库）
+# 再写 service / handler 测试文件后：
+go test ./internal/... -count=1
 ```
 
+- **auth**：纯函数，最适合先写。  
+- **handler**：`r := NewRouter(...)`，`httptest.NewRecorder` + `http.NewRequest`，断言状态码与 JSON。  
+- **service 下单**：需要 DB——可用本机 `training_lib` 的测试库名，或在测试里 `gorm` 连 MySQL；测「库存够下单成功 / 不够返回 error」。
+
+参考 Part02：`httptest` 写法（`training_golang` 里 httppractice）。
+
+### F2 · Docker 怎么验收
+
+```bash
+cd ~/train_hub/e_commerce_platform
+docker compose -f deployments/docker-compose.yml up --build
+# 另开终端
+curl -i http://127.0.0.1:8080/healthz
+```
+
+compose 里 app 的 `MYSQL_DSN` 指向服务名 `mysql`；本机端口 `8080` / `3306`。  
+停：`Ctrl+C` 或 `docker compose -f deployments/docker-compose.yml down`。
+
+**验收：** `go test ./internal/...` 通过；`compose up` 后 `/healthz` 200。
+
 ---
 
-## 阶段 F · 测试与 Docker
-
-| 状态 | 目录 / 符号 | 要做什么 |
-|------|-------------|----------|
-| ☐ | `internal/service/*_test.go`（自建） | PlaceOrder / DeductStock 单测 |
-| ☐ | `internal/handler/*_test.go`（自建） | `httptest.NewRecorder` + Gin 路由 |
-| ☐ | `deployments/Dockerfile` / `docker-compose.yml` | 能 `compose up` 起服务 |
-| ☐ | `README.md` | 补启动步骤与超卖复现说明 |
-
----
-
-## 建议实现顺序（按调用链）
+## 建议实现顺序（阶段 F）
 
 ```text
-NewRouter 挂路由
-  → Handler（Gin 读请求、写响应）
-    → Service（业务规则）
-      → Repository（SQL/GORM）
+1. auth 单测（无 DB）
+2. handler /healthz httptest
+3. （可选）service PlaceOrder 连测试库
+4. docker compose up --build + curl healthz
 ```
-
-下一阶段重点：跑 `scripts/oversell_demo.sh` 压测，核对库存与订单行不超卖（阶段 E · 3.5）。
