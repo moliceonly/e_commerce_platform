@@ -26,9 +26,9 @@ func (r *ProductRepo) Get(ctx context.Context, id uint) (*model.Product, error) 
 	var product model.Product
 	err := r.DB.WithContext(ctx).Where("id = ?", id).First(&product).Error
 	if err != nil {
-        return nil, err
-    }
-    return &product, nil
+		return nil, err
+	}
+	return &product, nil
 }
 
 func (r *ProductRepo) List(ctx context.Context, offset, limit int) ([]model.Product, error) {
@@ -43,8 +43,8 @@ func (r *ProductRepo) DeductStockTx(ctx context.Context, tx *gorm.DB, productID 
 	var product model.Product
 
 	if err := tx.WithContext(ctx).
-	Clauses(clause.Locking{Strength: "UPDATE"}).
-	First(&product, productID).Error; err != nil {
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&product, productID).Error; err != nil {
 		return err
 	}
 
@@ -52,7 +52,7 @@ func (r *ProductRepo) DeductStockTx(ctx context.Context, tx *gorm.DB, productID 
 		return fmt.Errorf("stock not enough")
 	}
 
-	upd := tx.WithContext(ctx).Model(&product).Update("stock", product.Stock - qty )
+	upd := tx.WithContext(ctx).Model(&product).Update("stock", product.Stock-qty)
 
 	return upd.Error
 
@@ -71,25 +71,25 @@ func (r *OrderRepo) GetByID(ctx context.Context, id uint) (*model.Order, error) 
 	_ = id
 	var order model.Order
 	err := r.DB.WithContext(ctx).Where("id = ?", id).First(&order).Error
-	return order, err
+	return &order, err
 }
 
 func (r *OrderRepo) ListByUser(ctx context.Context, userID uint, status string, offset, limit int) ([]model.Order, error) {
-	
+
 	var orders []model.Order
 
 	q := r.DB.WithContext(ctx).Where("user_id = ?", userID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
-	
+
 	err := q.Offset(offset).Limit(limit).Find(&orders).Error
 	return orders, err
 
 }
 
 func (r *OrderRepo) UpdateStatus(ctx context.Context, orderID uint, from, to model.OrderStatus) error {
-	
+
 	if from == "" || to == "" {
 		return fmt.Errorf("Invalid status")
 	}
@@ -114,26 +114,39 @@ func (r *UserRepo) Create(ctx context.Context, u *model.User) error {
 }
 
 func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*model.User, error) {
-	_ = ctx
-	_ = email
 	var user model.User
 	q := r.DB.WithContext(ctx).Find(&user, email)
-	return user, q.Error
+	return &user, q.Error
 }
 
 // CartRepo 购物车。
 type CartRepo struct{ DB *gorm.DB }
 
 func (r *CartRepo) Upsert(ctx context.Context, userID, productID uint, qty int) error {
-	_ = ctx
-	_ = userID
-	_ = productID
-	_ = qty
-	return fmt.Errorf("TODO: Cart.Upsert")
+
+	var cartItem model.CartItem
+	q := r.DB.WithContext(ctx).Where("userid = ? AND productid = ?").Find(&cartItem)
+
+	if q.Error == gorm.ErrRecordNotFound {
+		return r.DB.WithContext(ctx).Create(&model.CartItem{
+			UserID:    userID,
+			ProductID: productID,
+			Quantity:  qty,
+		}).Error
+	} else if q.Error == nil {
+		return q.Error
+	}
+
+	return r.DB.WithContext(ctx).Model(&cartItem).Update("quantity", cartItem.Quantity+qty).Error
 }
 
 func (r *CartRepo) ListByUser(ctx context.Context, userID uint) ([]model.CartItem, error) {
-	_ = ctx
-	_ = userID
-	return nil, fmt.Errorf("TODO: Cart.ListByUser")
+
+	var cartItem []model.CartItem
+
+	q := r.DB.WithContext(ctx).Where("userid = ?").Find(&cartItem)
+	if q.Error == nil {
+		return nil, q.Error
+	}
+	return cartItem, nil
 }

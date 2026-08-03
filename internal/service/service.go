@@ -16,24 +16,21 @@ type CatalogService struct {
 }
 
 func (s *CatalogService) CreateProduct(ctx context.Context, name string, price int64, stock int) (*model.Product, error) {
-	_ = ctx
-	_ = name
-	_ = price
-	_ = stock
-	return nil, fmt.Errorf("TODO: CreateProduct")
+	product := model.Product{
+		Name:  name,
+		Price: price,
+		Stock: stock,
+	}
+	return &product, s.Products.Create(ctx, &product)
 }
 
 func (s *CatalogService) GetProduct(ctx context.Context, id uint) (*model.Product, error) {
-	_ = ctx
-	_ = id
-	return nil, fmt.Errorf("TODO: GetProduct")
+	return s.Products.Get(ctx, id)
 }
 
 func (s *CatalogService) ListProducts(ctx context.Context, page, pageSize int) ([]model.Product, error) {
-	_ = ctx
-	_ = page
-	_ = pageSize
-	return nil, fmt.Errorf("TODO: ListProducts")
+	offset := (page - 1) * pageSize
+	return s.Products.List(ctx, offset, pageSize)
 }
 
 // AuthService 注册登录。

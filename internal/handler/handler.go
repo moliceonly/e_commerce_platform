@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"e_commerce_platform/internal/response"
 	"e_commerce_platform/internal/service"
@@ -30,17 +31,49 @@ type ProductHandler struct{ Svc *service.CatalogService }
 
 func (h *ProductHandler) Create(c *gin.Context) {
 	// TODO(3.1): bind name/price/stock → Svc.CreateProduct
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: CreateProduct")
+	var req struct {
+		Name  string `json:"name" binding:"required"`
+		Price int64  `json:"price" binding:"gte=0"`
+		Stock int    `json:"stock" binding:"gte=0"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+
+	p, err := h.Svc.CreateProduct(c.Request.Context(), req.Name, req.Price, req.Stock)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, 40003, err.Error())
+		return
+	}
+	response.OK(c, p)
 }
 
 func (h *ProductHandler) Get(c *gin.Context) {
 	// TODO(3.1): path :id → Svc.GetProduct
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: GetProduct")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+	product, err := h.Svc.GetProduct(c.Request.Context(), uint(id))
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, 40401, err.Error())
+		return
+	}
+	response.OK(c, product)
 }
 
 func (h *ProductHandler) List(c *gin.Context) {
 	// TODO(3.1 / 3.3): query page/page_size → Svc.ListProducts
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: ListProducts")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	list, err := h.Svc.ListProducts(c.Request.Context(), page, size)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	response.OK(c, list)
 }
 
 type CartHandler struct{ Svc *service.CartService }

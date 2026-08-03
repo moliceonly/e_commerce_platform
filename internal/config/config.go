@@ -19,7 +19,7 @@ func Load() Config {
 	return Config{
 		AppEnv:    getenv("APP_ENV", "local"),
 		HTTPAddr:  getenv("HTTP_ADDR", ":8080"),
-		MySQLDSN:  getenv("MYSQL_DSN", ""),
+		MySQLDSN:  getenv("MYSQL_DSN", "trainer:Train2026Lib!@tcp(127.0.0.1:3306)/training_lib?charset=utf8mb4&parseTime=True&loc=Local"),
 		RedisAddr: getenv("REDIS_ADDR", "127.0.0.1:6379"),
 		JWTSecret: getenv("JWT_SECRET", "dev-secret-change-me"),
 	}

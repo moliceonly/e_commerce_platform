@@ -22,12 +22,17 @@ func NewRouter(d Deps) *gin.Engine {
 	// TODO(3.3): r.Use(middleware.RequestID())
 
 	r.GET("/healthz", Healthz)
+	prodH := &ProductHandler{Svc: d.Catalog}
 
 	_ = d // 装配 Auth/Catalog/Cart/Order handler 后挂到下面分组
 
-	// TODO(3.1): v1 := r.Group("/api/v1")
+	v1 := r.Group("/api/v1")
+	{
+		v1.GET("/products", prodH.List)
+		v1.GET("/products/:id", prodH.Get)
+		v1.POST("/products", prodH.Create)
+	}
 	// TODO(3.2): POST /auth/register, /auth/login
-	// TODO(3.1): GET/POST /products ...
 	// TODO(3.2): 需登录组 + middleware.JWTAuth(d.JWTSecret)
 	//   POST /cart/items, POST /orders, GET /orders, POST /orders/:id/transition
 

@@ -1,10 +1,16 @@
 package main
 
 import (
+	"errors"
 	"log"
 
 	"e_commerce_platform/internal/config"
 	"e_commerce_platform/internal/handler"
+	"e_commerce_platform/internal/repository"
+	"e_commerce_platform/internal/service"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // 入口：读配置 → 组装依赖 → 起 HTTP。
@@ -13,9 +19,25 @@ func main() {
 	cfg := config.Load()
 
 	// TODO(3.1): 用 cfg.MySQLDSN 打开 gorm，AutoMigrate
+	mysqlDsn := cfg.MySQLDSN
+	if mysqlDsn == "" {
+		log.Fatal(errors.New("mysqlDSN empty"))
+	}
+	db, err := gorm.Open(mysql.Open(cfg.MySQLDSN), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	productRepo := repository.ProductRepo{DB: db}
+	if err := productRepo.AutoMigrate(); err != nil {
+		log.Fatal(err)
+	}
+	catalogSvc := &service.CatalogService{Products: &productRepo}
+
 	// TODO(3.1): 组装 repository → service → handler.Deps
 	r := handler.NewRouter(handler.Deps{
 		JWTSecret: cfg.JWTSecret,
+		Catalog:   catalogSvc,
 		// Auth / Catalog / Cart / Order 自己注入
 	})
 
