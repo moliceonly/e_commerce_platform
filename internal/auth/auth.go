@@ -3,21 +3,25 @@ package auth
 import (
 	"fmt"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // HashPassword 注册时哈希（3.2：禁止明文）。
 func HashPassword(plain string) (string, error) {
-	_ = plain
 	// TODO: bcrypt.GenerateFromPassword
-	return "", fmt.Errorf("TODO: HashPassword")
+	b, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // CheckPassword 登录校验。
 func CheckPassword(hash, plain string) bool {
-	_ = hash
-	_ = plain
 	// TODO: bcrypt.CompareHashAndPassword
-	return false
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)) == nil
 }
 
 // Claims JWT 载荷（自己定字段：uid / role / exp）。
@@ -25,22 +29,40 @@ type Claims struct {
 	UserID uint   `json:"uid"`
 	Role   string `json:"role"`
 	// TODO: 嵌入 jwt.RegisteredClaims
+	jwt.RegisteredClaims
 }
 
 // SignToken 签发 JWT。
 func SignToken(secret string, userID uint, role string, ttl time.Duration) (string, error) {
-	_ = secret
-	_ = userID
-	_ = role
-	_ = ttl
 	// TODO: jwt.NewWithClaims + SignedString
-	return "", fmt.Errorf("TODO: SignToken")
+	claims := Claims{
+		UserID: userID,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }
 
 // ParseToken 校验 JWT。
 func ParseToken(secret, tokenStr string) (*Claims, error) {
-	_ = secret
-	_ = tokenStr
 	// TODO: jwt.ParseWithClaims
-	return nil, fmt.Errorf("TODO: ParseToken")
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return claims, nil
 }

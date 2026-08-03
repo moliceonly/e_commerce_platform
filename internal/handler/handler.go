@@ -20,12 +20,43 @@ type AuthHandler struct{ Svc *service.AuthService }
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	// TODO(3.2): bind email/password → Svc.Register → OK
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: Register")
+	var req struct {
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+	user, err := h.Svc.Register(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	response.OK(c, gin.H{
+		"id":    user.ID,
+		"email": user.Email,
+	})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	// TODO(3.2): bind → Svc.Login → 返回 token
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: Login")
+	var req struct {
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+	token, err := h.Svc.Login(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	response.OK(c, gin.H{
+		"token": token,
+	})
 }
 
 type ProductHandler struct{ Svc *service.CatalogService }
@@ -81,11 +112,7 @@ type CartHandler struct{ Svc *service.CartService }
 
 func (h *CartHandler) Add(c *gin.Context) {
 	// TODO(3.2): 从 context 取 userID，bind product_id/quantity → Svc.Add
-	userid := uint(1)
-	// if err != nil {
-	// 	response.Fail(c, http.StatusBadRequest, 40001, err.Error())
-	// 	return
-	// }
+	userId := c.GetUint("userID")
 
 	var req struct {
 		ProductID uint `json:"product_id" binding:"required"`
@@ -96,7 +123,7 @@ func (h *CartHandler) Add(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
 		return
 	}
-	if err := h.Svc.Add(c.Request.Context(), uint(userid), req.ProductID, req.Quantity); err != nil {
+	if err := h.Svc.Add(c.Request.Context(), userId, req.ProductID, req.Quantity); err != nil {
 		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
 		return
 	}
@@ -107,7 +134,7 @@ type OrderHandler struct{ Svc *service.OrderService }
 
 func (h *OrderHandler) Place(c *gin.Context) {
 	// TODO(3.1/B): bind items → Svc.PlaceOrder（事务扣库存）
-	userID := uint(1)
+	userId := c.GetUint("userID")
 	var req struct {
 		Items []struct {
 			ProductID uint `json:"product_id" binding:"required"`
@@ -126,7 +153,7 @@ func (h *OrderHandler) Place(c *gin.Context) {
 			Quantity:  item.Quantity,
 		})
 	}
-	o, err := h.Svc.PlaceOrder(c.Request.Context(), userID, items)
+	o, err := h.Svc.PlaceOrder(c.Request.Context(), userId, items)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
 		return
@@ -141,7 +168,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 
 func (h *OrderHandler) Transition(c *gin.Context) {
 	// TODO(3.2): 校验订单归属 + 状态机 → Svc.Transition
-	userID := uint(1)
+	userId := c.GetUint("userID")
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -157,7 +184,7 @@ func (h *OrderHandler) Transition(c *gin.Context) {
 		return
 	}
 
-	if err := h.Svc.Transition(c.Request.Context(), userID, uint(id), req.Status); err != nil {
+	if err := h.Svc.Transition(c.Request.Context(), userId, uint(id), req.Status); err != nil {
 		response.Fail(c, http.StatusForbidden, 40301, err.Error())
 		return
 	}

@@ -113,8 +113,8 @@ func (r *UserRepo) Create(ctx context.Context, u *model.User) error {
 
 func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*model.User, error) {
 	var user model.User
-	q := r.DB.WithContext(ctx).Find(&user, email)
-	return &user, q.Error
+	err := r.DB.WithContext(ctx).Where("email = ?", email).First(&user).Error
+	return &user, err
 }
 
 // CartRepo 购物车。

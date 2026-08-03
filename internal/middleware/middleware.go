@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
+	"e_commerce_platform/internal/auth"
 	"e_commerce_platform/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +26,22 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_ = secret
 		// TODO: Authorization: Bearer ... → auth.ParseToken → c.Set(CtxUserID, ...)
-		response.Fail(c, http.StatusUnauthorized, 40100, "TODO: JWTAuth")
-		c.Abort()
+		h := c.GetHeader("Authorization")
+		if !strings.HasPrefix(h, "Bearer") {
+			response.Fail(c, http.StatusUnauthorized, 40100, "missing bearer token")
+			c.Abort()
+			return
+		}
+		tokenStr := strings.TrimPrefix(h, "Bearer ")
+
+		claims, err := auth.ParseToken(secret, tokenStr)
+		if err != nil {
+			response.Fail(c, http.StatusUnauthorized, 40101, "invalid token")
+			c.Abort()
+			return
+		}
+
+		c.Set(CtxUserID, claims.UserID)
+		c.Next()
 	}
 }

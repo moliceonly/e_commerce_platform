@@ -2,7 +2,7 @@
 
 依赖方向：**handler → service → repository**。勾完一阶段再进下一阶段。
 
-**当前进度：阶段 A、B 已完成；下一阶段 C（JWT 鉴权）。**
+**当前进度：阶段 A、B、C（含路线图 3.1 / 3.2）已完成；下一阶段 D（3.3）。**
 
 ---
 
@@ -26,40 +26,40 @@
 
 ## 阶段 B · 加购下单与状态流转 ✅
 
-| 状态 | 目录 / 符号 | 要做什么 |
-|------|-------------|----------|
-| ✅ | `handler.CartHandler.Add` | 暂写死 userID=1；bind → CartService |
-| ✅ | `service.CartService.Add` | `Products.Get` → `CartRepo.Upsert` |
-| ✅ | `repository.CartRepo.Upsert` / `ListByUser` | 购物车读写 |
-| ✅ | `handler.OrderHandler.Place` | bind items → PlaceOrder |
-| ✅ | `service.OrderService.PlaceOrder` | 事务：扣库存 → 写订单行（清购物车可选，未做） |
-| ✅ | `repository.ProductRepo.DeductStockTx` | 事务内 `FOR UPDATE` 扣库存 |
-| ✅ | `repository.OrderRepo.CreateWithItems` | 同事务写 Order + OrderItem |
-| ✅ | `handler.OrderHandler.Transition` | bind status → Transition |
-| ✅ | `service.OrderService.Transition` | 状态机 pending→paid→shipped→done |
-| ✅ | `repository.OrderRepo.GetByID` / `UpdateStatus` | 读单、条件更新状态 |
-| ✅ | `handler.NewRouter` | 挂 cart / orders / transition |
+| 状态 | 目录 / 符号　　　　　　　　　　　　　　　　　　 | 要做什么　　　　　　　　　　　　　　　　　　　|
+| ------| -------------------------------------------------| -----------------------------------------------|
+| ✅　　| `handler.CartHandler.Add`　　　　　　　　　　　 | 暂写死 userID=1；bind → CartService　　　　　 |
+| ✅　　| `service.CartService.Add`　　　　　　　　　　　 | `Products.Get` → `CartRepo.Upsert`　　　　　　|
+| ✅　　| `repository.CartRepo.Upsert` / `ListByUser`　　 | 购物车读写　　　　　　　　　　　　　　　　　　|
+| ✅　　| `handler.OrderHandler.Place`　　　　　　　　　　| bind items → PlaceOrder　　　　　　　　　　　 |
+| ✅　　| `service.OrderService.PlaceOrder`　　　　　　　 | 事务：扣库存 → 写订单行（清购物车可选，未做） |
+| ✅　　| `repository.ProductRepo.DeductStockTx`　　　　　| 事务内 `FOR UPDATE` 扣库存　　　　　　　　　　|
+| ✅　　| `repository.OrderRepo.CreateWithItems`　　　　　| 同事务写 Order + OrderItem　　　　　　　　　　|
+| ✅　　| `handler.OrderHandler.Transition`　　　　　　　 | bind status → Transition　　　　　　　　　　　|
+| ✅　　| `service.OrderService.Transition`　　　　　　　 | 状态机 pending→paid→shipped→done　　　　　　　|
+| ✅　　| `repository.OrderRepo.GetByID` / `UpdateStatus` | 读单、条件更新状态　　　　　　　　　　　　　　|
+| ✅　　| `handler.NewRouter`　　　　　　　　　　　　　　 | 挂 cart / orders / transition　　　　　　　　 |
 
 **验收：** 下单后库存减少；能推进订单状态。  
-**说明：** 阶段 B 的 userID 仍写死为 `1`；阶段 C 改为 JWT context。
+**说明：** userID 已在阶段 C 改为 JWT context（`c.GetUint("userID")`）。
 
 ---
 
-## 阶段 C · 3.2 认证鉴权
+## 阶段 C · 3.2 认证鉴权 ✅
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
-| ☐ | `auth.HashPassword` / `CheckPassword` | bcrypt |
-| ☐ | `auth.SignToken` / `ParseToken` + `Claims` | JWT HS256 |
-| ☐ | `repository.UserRepo.Create` / `FindByEmail` | 用户表 |
-| ☐ | `service.AuthService.Register` / `Login` | 哈希入库 / 验密发 token |
-| ☐ | `handler.AuthHandler.Register` / `Login` | bind + binding 标签校验 |
-| ☐ | `middleware.JWTAuth` | Bearer → ParseToken → `c.Set(CtxUserID)` |
-| ☐ | `handler.NewRouter` | 公开：`/auth/*`、商品；保护：cart/orders + `JWTAuth` |
-| ☐ | `handler.CartHandler.Add` / `OrderHandler.*` | 用 `c.GetUint(middleware.CtxUserID)`，禁止信任 body 里的 user_id |
-| ☐ | `service.OrderService.Transition` | **越权**：订单 `user_id` 必须等于当前用户（逻辑已有，需接真 userID） |
+| ✅ | `auth.HashPassword` / `CheckPassword` | bcrypt |
+| ✅ | `auth.SignToken` / `ParseToken` + `Claims` | JWT HS256 |
+| ✅ | `repository.UserRepo.Create` / `FindByEmail` | 用户表 |
+| ✅ | `service.AuthService.Register` / `Login` | 哈希入库 / 验密发 token |
+| ✅ | `handler.AuthHandler.Register` / `Login` | bind + binding |
+| ✅ | `middleware.JWTAuth` | Bearer → ParseToken → `c.Set(CtxUserID)` |
+| ✅ | `handler.NewRouter` | 公开 auth/商品；保护 cart/orders + `JWTAuth` |
+| ✅ | `handler.CartHandler.Add` / `OrderHandler.*` | `c.GetUint("userID")` |
+| ✅ | `service.OrderService.Transition` | 校验订单归属当前用户 |
 
-**验收：** 无 token 访问订单 401；用户 A 不能改用户 B 订单。
+**验收：** 无 token 访问订单 401；登录后带 Bearer 可下单。
 
 ---
 
@@ -111,4 +111,4 @@ NewRouter 挂路由
       → Repository（SQL/GORM）
 ```
 
-下一阶段重点：`internal/auth/*` + `middleware.JWTAuth` + 路由分组鉴权。
+下一阶段重点：`middleware.RequestID`、订单列表分页、优雅停机（阶段 D · 3.3）。

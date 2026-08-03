@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"e_commerce_platform/internal/auth"
 	"e_commerce_platform/internal/model"
 	"e_commerce_platform/internal/repository"
 
@@ -40,19 +42,39 @@ type AuthService struct {
 }
 
 func (s *AuthService) Register(ctx context.Context, email, password string) (*model.User, error) {
-	_ = ctx
-	_ = email
-	_ = password
 	// TODO(3.2): auth.HashPassword + Users.Create
-	return nil, fmt.Errorf("TODO: Register")
+	hashPassword, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	user := model.User{
+		Email:        email,
+		PasswordHash: hashPassword,
+		Role:         "user",
+	}
+	if _, err := s.Users.FindByEmail(ctx, email); err == nil {
+		return nil, fmt.Errorf("email already used")
+	} else if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	if err := s.Users.Create(ctx, &user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (token string, err error) {
-	_ = ctx
-	_ = email
-	_ = password
 	// TODO(3.2): FindByEmail + CheckPassword + SignToken
-	return "", fmt.Errorf("TODO: Login")
+	user, err := s.Users.FindByEmail(ctx, email)
+	if err != nil {
+		return "", fmt.Errorf("invalid email or password")
+	}
+	if !auth.CheckPassword(user.PasswordHash, password) {
+		return "", fmt.Errorf("invalid email or password")
+	}
+	return auth.SignToken(s.JWTSecret, user.ID, user.Role, 24*time.Hour)
 }
 
 // CartService 加购。
