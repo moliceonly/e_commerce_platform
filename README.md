@@ -5,7 +5,7 @@
 - 各阶段要改哪个函数：见 [TODO.md](./TODO.md)
 - Gin API 速查：见 [GIN.md](./GIN.md)
 
-**进度：阶段 A / B / C（含路线图 3.1、3.2）已完成 → 下一步阶段 D（3.3）。**
+**进度：阶段 A / B / C / D（含路线图 3.1、3.2、3.3）已完成 → 下一步阶段 E（3.5 超卖压测）。**
 
 ## 阶段与路线图编号对应
 
@@ -16,7 +16,7 @@
 | A | **3.1** | `go run` + `/healthz` + env + `/api/v1` 商品 CRUD | ✅ |
 | B | （业务，无单独章节） | 加购、事务下单扣库存、订单状态流转 | ✅ |
 | C | **3.2** | 注册登录 JWT、鉴权中间件、越权校验 | ✅ |
-| D | **3.3** | request_id、订单分页、优雅停机 | ☐ |
+| D | **3.3** | request_id、订单分页、优雅停机 | ✅ |
 | E | **3.5** | 超卖压测与加固 | ☐（`DeductStockTx` 已有 FOR UPDATE） |
 | F | **3.4** + 部署 | 单测、Dockerfile / compose | ☐ |
 
@@ -25,18 +25,18 @@
 ## 目录
 
 ```text
-cmd/server/           # 入口：配置、DB、组装依赖、起 HTTP
+cmd/server/           # 入口：配置、DB、组装依赖、http.Server + 优雅停机 ✅
 internal/
   config/             # env 配置
   model/              # User / Product / Cart / Order
-  repository/         # DB 访问（含 DeductStockTx）
+  repository/         # DB 访问（含 DeductStockTx、ClearByUser）
   service/            # 业务编排
-  handler/            # Gin HTTP + 路由
-  middleware/         # JWTAuth ✅；RequestID 待 D
+  handler/            # Gin HTTP + 路由（含订单列表）
+  middleware/         # JWTAuth ✅；RequestID ✅
   auth/               # bcrypt / JWT ✅
   response/           # {code,message,data}
-scripts/              # 超卖脚本
-deployments/          # Docker
+scripts/              # 超卖脚本（阶段 E）
+deployments/          # Docker（阶段 F）
 ```
 
 依赖方向：**handler → service → repository**（handler 禁止直连 DB）。
@@ -55,7 +55,8 @@ go mod tidy
 go run ./cmd/server
 ```
 
-MySQL 可复用 Part02：`trainer` / `Train2026Lib!` / `training_lib`。
+MySQL 可复用 Part02：`trainer` / `Train2026Lib!` / `training_lib`。  
+停机：在运行终端按 `Ctrl+C`，应走 `Shutdown` 优雅退出。
 
 ## 清空练习数据（可选）
 
@@ -71,53 +72,69 @@ SET FOREIGN_KEY_CHECKS=1;
 "
 ```
 
-## 冒烟测试（A + B + C）
+## 冒烟测试（A + B + C + D）
 
 ```bash
+BASE=http://127.0.0.1:8080
+
+# —— D · Request-ID（看响应头 X-Request-ID）——
+curl -i "$BASE/healthz"
+curl -i -H 'X-Request-ID: my-trace-1' "$BASE/healthz"
+
 # —— A · 探活与商品 ——
-curl http://127.0.0.1:8080/healthz
-curl -X POST http://127.0.0.1:8080/api/v1/products \
+curl -s -X POST "$BASE/api/v1/products" \
   -H 'Content-Type: application/json' \
   -d '{"name":"键盘","price":9900,"stock":10}'
-curl 'http://127.0.0.1:8080/api/v1/products?page=1&page_size=20'
-curl http://127.0.0.1:8080/api/v1/products/1
+curl -s "$BASE/api/v1/products?page=1&page_size=20"
+curl -s "$BASE/api/v1/products/1"
 
 # —— C · 无 token 下单应 401 ——
-curl -s -X POST http://127.0.0.1:8080/api/v1/orders \
+curl -s -i -X POST "$BASE/api/v1/orders" \
   -H 'Content-Type: application/json' \
   -d '{"items":[{"product_id":1,"quantity":1}]}'
 
 # —— C · 注册 / 登录 ——
-curl -s -X POST http://127.0.0.1:8080/api/v1/auth/register \
+curl -s -X POST "$BASE/api/v1/auth/register" \
   -H 'Content-Type: application/json' \
   -d '{"email":"demo@example.com","password":"123456"}'
-curl -s -X POST http://127.0.0.1:8080/api/v1/auth/login \
+# 有 jq 时可自动取 token；否则从登录 JSON 复制 data.token
+export TOKEN=$(curl -s -X POST "$BASE/api/v1/auth/login" \
   -H 'Content-Type: application/json' \
-  -d '{"email":"demo@example.com","password":"123456"}'
-# 将 TOKEN 换成登录返回的 data.token
-export TOKEN='粘贴token'
+  -d '{"email":"demo@example.com","password":"123456"}' \
+  | jq -r '.data.token')
+echo "TOKEN=$TOKEN"
 
 # —— B+C · 加购 / 下单 / 流转（需 Bearer）——
-curl -s -X POST http://127.0.0.1:8080/api/v1/cart/items \
+curl -s -X POST "$BASE/api/v1/cart/items" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"product_id":1,"quantity":1}'
-curl -s -X POST http://127.0.0.1:8080/api/v1/orders \
+  -d '{"product_id":1,"quantity":2}'
+curl -s -X POST "$BASE/api/v1/orders" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"items":[{"product_id":1,"quantity":1}]}'
-# 将下面路径中的 1 换成订单 ID
-curl -s -X POST http://127.0.0.1:8080/api/v1/orders/1/transition \
+# 将 ORDER_ID 换成返回的订单 id
+export ORDER_ID=1
+curl -s -X POST "$BASE/api/v1/orders/$ORDER_ID/transition" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"status":"paid"}'
+
+# —— D · 订单列表（分页 + status）——
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/orders?page=1&page_size=20"
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/orders?page=1&page_size=20&status=paid"
 ```
 
-查库订单状态：
+查库：
 
 ```bash
-mysql -u trainer -p -h 127.0.0.1 training_lib \
-  -e "SELECT id, user_id, status, total FROM orders ORDER BY id DESC;"
+mysql -u trainer -p -h 127.0.0.1 training_lib -e "
+SELECT id, user_id, status, total FROM orders ORDER BY id DESC;
+SELECT id, user_id, product_id, quantity, deleted_at FROM cart_items;
+SELECT id, name, stock FROM products;
+"
 ```
 
 ## 订单状态约定
@@ -127,6 +144,12 @@ pending → paid → shipped → done
        ↘ cancelled
 ```
 
-## 超卖修复方向
+## 下一阶段 · E（3.5 超卖）
 
-事务内 `SELECT ... FOR UPDATE`（`DeductStockTx` 已实现），或 `UPDATE stock=stock-? WHERE id=? AND stock>=?` 检查 `RowsAffected`。阶段 E（路线图 3.5）用 `scripts/oversell_demo.sh` 压测确认。
+`DeductStockTx` 已用事务内 `FOR UPDATE`。阶段 E 用脚本压测确认不超卖：
+
+```bash
+export TOKEN=... PRODUCT_ID=1 QTY=1 CONCURRENCY=50
+./scripts/oversell_demo.sh
+# 然后对比 products.stock 与 sum(order_items.quantity)
+```

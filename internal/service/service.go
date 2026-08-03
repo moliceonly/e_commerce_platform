@@ -125,7 +125,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 	err := s.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var total int64
 		var orderItems []model.OrderItem
-
+		var productIDs = make([]uint, 0, len(items))
 		for _, item := range items {
 
 			product, err := s.Products.Get(ctx, item.ProductID)
@@ -142,6 +142,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 				Quantity:  item.Quantity,
 				Price:     product.Price,
 			})
+			productIDs = append(productIDs, item.ProductID)
 		}
 
 		order = &model.Order{
@@ -149,8 +150,10 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 			Status: model.OrderPending,
 			Total:  total,
 		}
-
-		return s.Orders.CreateWithItems(ctx, tx, order, orderItems)
+		if err := s.Orders.CreateWithItems(ctx, tx, order, orderItems); err != nil {
+			return err
+		}
+		return s.Carts.ClearByUser(ctx, tx, userID, productIDs)
 
 	})
 
@@ -182,4 +185,15 @@ func (s *OrderService) Transition(ctx context.Context, userID, orderID uint, to 
 		return fmt.Errorf("invalid transition %s -> %s", from, to)
 	}
 	return s.Orders.UpdateStatus(ctx, orderID, from, to)
+}
+
+// ListOrders 当前用户订单分页列表（可选 status 过滤）。
+func (s *OrderService) ListOrders(ctx context.Context, userID uint, status string, page, pageSize int) ([]model.Order, error) {
+	// TODO(3.3): offset := (page-1)*pageSize → Orders.ListByUser
+	offset := (page - 1) * pageSize
+	q, err := s.Orders.ListByUser(ctx, userID, status, offset, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return q, nil
 }

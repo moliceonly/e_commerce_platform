@@ -2,7 +2,7 @@
 
 依赖方向：**handler → service → repository**。勾完一阶段再进下一阶段。
 
-**当前进度：阶段 A、B、C（含路线图 3.1 / 3.2）已完成；下一阶段 D（3.3）。**
+**当前进度：阶段 A、B、C、D（含路线图 3.1 / 3.2 / 3.3）已完成；下一阶段 E（3.5 超卖压测）。**
 
 ---
 
@@ -32,7 +32,7 @@
 | ✅　　| `service.CartService.Add`　　　　　　　　　　　 | `Products.Get` → `CartRepo.Upsert`　　　　　　|
 | ✅　　| `repository.CartRepo.Upsert` / `ListByUser`　　 | 购物车读写　　　　　　　　　　　　　　　　　　|
 | ✅　　| `handler.OrderHandler.Place`　　　　　　　　　　| bind items → PlaceOrder　　　　　　　　　　　 |
-| ✅　　| `service.OrderService.PlaceOrder`　　　　　　　 | 事务：扣库存 → 写订单行（清购物车可选，未做） |
+| ✅　　| `service.OrderService.PlaceOrder`　　　　　　　 | 事务：扣库存 → 写订单行（阶段 D 已加清车）　 |
 | ✅　　| `repository.ProductRepo.DeductStockTx`　　　　　| 事务内 `FOR UPDATE` 扣库存　　　　　　　　　　|
 | ✅　　| `repository.OrderRepo.CreateWithItems`　　　　　| 同事务写 Order + OrderItem　　　　　　　　　　|
 | ✅　　| `handler.OrderHandler.Transition`　　　　　　　 | bind status → Transition　　　　　　　　　　　|
@@ -63,31 +63,39 @@
 
 ---
 
-## 阶段 D · 3.3 横切
+## 阶段 D · 3.3 横切 ✅
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
-| ☐ | `middleware.RequestID` | 读/生成 `X-Request-ID`，`c.Set` + 写响应头 |
-| ☐ | `handler.NewRouter` | `r.Use(middleware.RequestID())` |
-| ☐ | `handler.OrderHandler.List` | query `page`/`page_size`/`status` |
-| ☐ | `service`（可加 `ListOrders`）+ `repository.OrderRepo.ListByUser` | 分页过滤（repo 已有，接 handler/service） |
-| ☐ | `handler.ProductHandler.List` | 分页已接；可再打磨 |
-| ☐ | `cmd/server/main.go` → `main` | `http.Server` + `SIGINT/SIGTERM` + `Shutdown` |
-| ☐ | （可选）`PlaceOrder` 清空购物车 | 阶段 B 未做 |
+| ✅ | `middleware.RequestID` | 读/生成 `X-Request-ID`，`c.Set` + 写响应头 |
+| ✅ | `handler.NewRouter` | `r.Use(middleware.RequestID())` |
+| ✅ | `handler.OrderHandler.List` | query `page`/`page_size`/`status` |
+| ✅ | `service.OrderService.ListOrders` + `repository.OrderRepo.ListByUser` | 分页过滤 |
+| ✅ | `handler.ProductHandler.List` | 分页已接 |
+| ✅ | `cmd/server/main.go` → `main` | `http.Server` + `SIGINT/SIGTERM` + `Shutdown` |
+| ✅ | `PlaceOrder` + `CartRepo.ClearByUser` | 同事务按本次 `product_id IN` 清车 |
 
 **验收：** 响应带 `X-Request-ID`；订单列表可分页；`Ctrl+C` 优雅退出。
 
 ---
 
-## 阶段 E · 3.5 超卖
+## 阶段 E · 3.5 超卖 ← 当前
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
 | ☐ | `scripts/oversell_demo.sh` | 填好 TOKEN / PRODUCT_ID 后并发打 |
 | ⚠️ | `repository.ProductRepo.DeductStockTx` | 已有 `FOR UPDATE`；阶段 E 用脚本压测确认 |
 | ⚠️ | `service.OrderService.PlaceOrder` | 已用同一 `tx`；压测验证不超卖 |
+| ☐ | （可选）对照实验 | 临时去掉锁/条件更新，观察超卖后再改回 |
 
-**验收：** 并发下单后库存与订单数量一致、不超卖。
+**验收：** 并发下单后库存与订单数量一致、不超卖。  
+**做法：** 先造低库存商品（如 stock=5），`CONCURRENCY=50` 打 `oversell_demo.sh`，再查：
+
+```sql
+SELECT id, stock FROM products WHERE id = ?;
+SELECT COALESCE(SUM(quantity),0) FROM order_items WHERE product_id = ?;
+-- 期望：成功扣减合计 ≤ 初始库存，且 stock + 已售 = 初始库存
+```
 
 ---
 
@@ -111,4 +119,4 @@ NewRouter 挂路由
       → Repository（SQL/GORM）
 ```
 
-下一阶段重点：`middleware.RequestID`、订单列表分页、优雅停机（阶段 D · 3.3）。
+下一阶段重点：跑 `scripts/oversell_demo.sh` 压测，核对库存与订单行不超卖（阶段 E · 3.5）。

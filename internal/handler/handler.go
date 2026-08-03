@@ -163,7 +163,18 @@ func (h *OrderHandler) Place(c *gin.Context) {
 
 func (h *OrderHandler) List(c *gin.Context) {
 	// TODO(3.3): 分页 + status 过滤；只查当前用户
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: ListOrders")
+	userId := c.GetUint("userID")
+	status := c.Query("status")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	list, err := h.Svc.ListOrders(c.Request.Context(), userId, status, page, pageSize)
+	if err != nil {
+		response.Fail(c, http.StatusNotImplemented, 50001, "order not found")
+		return
+	}
+
+	response.OK(c, list)
 }
 
 func (h *OrderHandler) Transition(c *gin.Context) {

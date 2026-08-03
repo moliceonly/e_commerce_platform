@@ -8,6 +8,7 @@ import (
 	"e_commerce_platform/internal/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const CtxUserID = "userID"
@@ -17,6 +18,13 @@ const CtxRequestID = "requestID"
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: 读 X-Request-ID 或生成 uuid，写入 context + 响应头
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+
+		c.Set(CtxRequestID, requestID)
+		c.Header("X-Request-ID", requestID)
 		c.Next()
 	}
 }
@@ -24,7 +32,6 @@ func RequestID() gin.HandlerFunc {
 // JWTAuth 校验 Bearer Token（3.2）。
 func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		_ = secret
 		// TODO: Authorization: Bearer ... → auth.ParseToken → c.Set(CtxUserID, ...)
 		h := c.GetHeader("Authorization")
 		if !strings.HasPrefix(h, "Bearer") {

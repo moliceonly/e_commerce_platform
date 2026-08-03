@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"e_commerce_platform/internal/config"
 	"e_commerce_platform/internal/handler"
 	"e_commerce_platform/internal/repository"
 	"e_commerce_platform/internal/service"
+
+	"net/http"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -52,7 +59,15 @@ func main() {
 
 	log.Printf("listening on %s env=%s", cfg.HTTPAddr, cfg.AppEnv)
 	// TODO(3.3): 换成 http.Server + ListenAndServe + SIGTERM 优雅停机
-	if err := r.Run(cfg.HTTPAddr); err != nil {
-		log.Fatal(err)
-	}
+	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: r}
+	go srv.ListenAndServe()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	srv.Shutdown(ctx)
+
 }

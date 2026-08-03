@@ -20,6 +20,7 @@ type Deps struct {
 func NewRouter(d Deps) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery(), gin.Logger())
+	r.Use(middleware.RequestID())
 	// TODO(3.3): r.Use(middleware.RequestID())
 
 	r.GET("/healthz", Healthz)
@@ -45,6 +46,7 @@ func NewRouter(d Deps) *gin.Engine {
 		authz.POST("/cart/items", cartH.Add)
 		authz.POST("/orders", orderH.Place)
 		authz.POST("/orders/:id/transition", orderH.Transition)
+		authz.GET("/orders", orderH.List)
 	}
 	// TODO(3.2): POST /auth/register, /auth/login
 	// TODO(3.2): 需登录组 + middleware.JWTAuth(d.JWTSecret)

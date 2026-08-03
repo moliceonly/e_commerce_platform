@@ -148,3 +148,9 @@ func (r *CartRepo) ListByUser(ctx context.Context, userID uint) ([]model.CartIte
 	}
 	return cartItem, nil
 }
+
+func (r *CartRepo) ClearByUser(ctx context.Context, tx *gorm.DB, userID uint, productIDs []uint) error {
+	return tx.WithContext(ctx).
+		Where("user_id = ? AND product_id IN ?", userID, productIDs).
+		Delete(&model.CartItem{}).Error
+}
