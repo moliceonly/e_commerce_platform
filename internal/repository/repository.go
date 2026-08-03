@@ -67,8 +67,6 @@ func (r *OrderRepo) CreateWithItems(ctx context.Context, tx *gorm.DB, order *mod
 }
 
 func (r *OrderRepo) GetByID(ctx context.Context, id uint) (*model.Order, error) {
-	_ = ctx
-	_ = id
 	var order model.Order
 	err := r.DB.WithContext(ctx).Where("id = ?", id).First(&order).Error
 	return &order, err
@@ -94,7 +92,7 @@ func (r *OrderRepo) UpdateStatus(ctx context.Context, orderID uint, from, to mod
 		return fmt.Errorf("Invalid status")
 	}
 
-	upd := r.DB.WithContext(ctx).Where("id = ? AND status = ?", orderID, from).Update("status", to)
+	upd := r.DB.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status = ?", orderID, from).Update("status", to)
 	if upd.Error != nil {
 		return upd.Error
 	}
@@ -125,7 +123,7 @@ type CartRepo struct{ DB *gorm.DB }
 func (r *CartRepo) Upsert(ctx context.Context, userID, productID uint, qty int) error {
 
 	var cartItem model.CartItem
-	q := r.DB.WithContext(ctx).Where("userid = ? AND productid = ?").Find(&cartItem)
+	q := r.DB.WithContext(ctx).Where("user_id = ? AND product_id = ?", userID, productID).First(&cartItem)
 
 	if q.Error == gorm.ErrRecordNotFound {
 		return r.DB.WithContext(ctx).Create(&model.CartItem{
@@ -133,7 +131,7 @@ func (r *CartRepo) Upsert(ctx context.Context, userID, productID uint, qty int) 
 			ProductID: productID,
 			Quantity:  qty,
 		}).Error
-	} else if q.Error == nil {
+	} else if q.Error != nil {
 		return q.Error
 	}
 
@@ -144,8 +142,8 @@ func (r *CartRepo) ListByUser(ctx context.Context, userID uint) ([]model.CartIte
 
 	var cartItem []model.CartItem
 
-	q := r.DB.WithContext(ctx).Where("userid = ?").Find(&cartItem)
-	if q.Error == nil {
+	q := r.DB.WithContext(ctx).Where("user_id = ?", userID).Find(&cartItem)
+	if q.Error != nil {
 		return nil, q.Error
 	}
 	return cartItem, nil

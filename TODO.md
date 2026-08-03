@@ -2,43 +2,46 @@
 
 依赖方向：**handler → service → repository**。勾完一阶段再进下一阶段。
 
+**当前进度：阶段 A、B 已完成；下一阶段 C（JWT 鉴权）。**
+
 ---
 
-## 阶段 A · 3.1 空壳可跑
+## 阶段 A · 3.1 空壳可跑 ✅
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
-| ✅ 已有 | `handler.Healthz` | 探活，可先不动 |
-| ✅ 已有 | `config.Load` | 读 env；可改 viper |
-| ✅ 已有 | `response.OK` / `Fail` | 统一响应，直接用 |
-| ☐ | `cmd/server/main.go` → `main` | 开 MySQL + GORM；组装 repo→svc→`handler.Deps` |
-| ☐ | `repository.ProductRepo.AutoMigrate` | `AutoMigrate` 五张表 |
-| ☐ | `handler.NewRouter` | `r.Group("/api/v1")`；挂商品路由（可先不鉴权） |
-| ☐ | `handler.ProductHandler.Create/Get/List` | bind / path / query → 调 CatalogService |
-| ☐ | `service.CatalogService.CreateProduct/GetProduct/ListProducts` | 校验入参 → ProductRepo |
-| ☐ | `repository.ProductRepo.Create/Get/List` | GORM CRUD |
+| ✅ | `handler.Healthz` | 探活 |
+| ✅ | `config.Load` | 读 env |
+| ✅ | `response.OK` / `Fail` | 统一响应 |
+| ✅ | `cmd/server/main.go` → `main` | MySQL + GORM；组装 repo→svc→`handler.Deps` |
+| ✅ | `repository.ProductRepo.AutoMigrate` | 五张表 |
+| ✅ | `handler.NewRouter` | `/api/v1` + 商品路由 |
+| ✅ | `handler.ProductHandler.Create/Get/List` | bind / path / query → CatalogService |
+| ✅ | `service.CatalogService.CreateProduct/GetProduct/ListProducts` | → ProductRepo |
+| ✅ | `repository.ProductRepo.Create/Get/List` | GORM CRUD |
 
 **验收：** `go run ./cmd/server` + `curl /healthz`；能创建/查商品。
 
 ---
 
-## 阶段 B · 加购下单与状态流转
+## 阶段 B · 加购下单与状态流转 ✅
 
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
-| ☐ | `handler.CartHandler.Add` |（可暂时写死 userID=1）bind → CartService |
-| ☐ | `service.CartService.Add` | 查商品存在 → CartRepo.Upsert |
-| ☐ | `repository.CartRepo.Upsert` / `ListByUser` | 购物车读写 |
-| ☐ | `handler.OrderHandler.Place` | bind items → OrderService.PlaceOrder |
-| ☐ | `service.OrderService.PlaceOrder` | **事务**：扣库存 → 写订单行 →（可选）清购物车 |
-| ☐ | `repository.ProductRepo.DeductStockTx` | 事务内扣库存（可先简版，阶段 E 再加固） |
-| ☐ | `repository.OrderRepo.CreateWithItems` | 同事务写 `Order` + `OrderItem` |
-| ☐ | `handler.OrderHandler.Transition` | bind status → OrderService.Transition |
-| ☐ | `service.OrderService.Transition` | 状态机 pending→paid→shipped→done |
-| ☐ | `repository.OrderRepo.GetByID` / `UpdateStatus` | 读单、条件更新状态 |
-| ☐ | `handler.NewRouter` | 挂 `POST /cart/items`、`POST /orders`、`POST /orders/:id/transition` |
+| ✅ | `handler.CartHandler.Add` | 暂写死 userID=1；bind → CartService |
+| ✅ | `service.CartService.Add` | `Products.Get` → `CartRepo.Upsert` |
+| ✅ | `repository.CartRepo.Upsert` / `ListByUser` | 购物车读写 |
+| ✅ | `handler.OrderHandler.Place` | bind items → PlaceOrder |
+| ✅ | `service.OrderService.PlaceOrder` | 事务：扣库存 → 写订单行（清购物车可选，未做） |
+| ✅ | `repository.ProductRepo.DeductStockTx` | 事务内 `FOR UPDATE` 扣库存 |
+| ✅ | `repository.OrderRepo.CreateWithItems` | 同事务写 Order + OrderItem |
+| ✅ | `handler.OrderHandler.Transition` | bind status → Transition |
+| ✅ | `service.OrderService.Transition` | 状态机 pending→paid→shipped→done |
+| ✅ | `repository.OrderRepo.GetByID` / `UpdateStatus` | 读单、条件更新状态 |
+| ✅ | `handler.NewRouter` | 挂 cart / orders / transition |
 
-**验收：** 下单后库存减少；能推进订单状态。
+**验收：** 下单后库存减少；能推进订单状态。  
+**说明：** 阶段 B 的 userID 仍写死为 `1`；阶段 C 改为 JWT context。
 
 ---
 
@@ -54,7 +57,7 @@
 | ☐ | `middleware.JWTAuth` | Bearer → ParseToken → `c.Set(CtxUserID)` |
 | ☐ | `handler.NewRouter` | 公开：`/auth/*`、商品；保护：cart/orders + `JWTAuth` |
 | ☐ | `handler.CartHandler.Add` / `OrderHandler.*` | 用 `c.GetUint(middleware.CtxUserID)`，禁止信任 body 里的 user_id |
-| ☐ | `service.OrderService.Transition` | **越权**：订单 `user_id` 必须等于当前用户 |
+| ☐ | `service.OrderService.Transition` | **越权**：订单 `user_id` 必须等于当前用户（逻辑已有，需接真 userID） |
 
 **验收：** 无 token 访问订单 401；用户 A 不能改用户 B 订单。
 
@@ -67,9 +70,10 @@
 | ☐ | `middleware.RequestID` | 读/生成 `X-Request-ID`，`c.Set` + 写响应头 |
 | ☐ | `handler.NewRouter` | `r.Use(middleware.RequestID())` |
 | ☐ | `handler.OrderHandler.List` | query `page`/`page_size`/`status` |
-| ☐ | `service`（可加 `ListOrders`）+ `repository.OrderRepo.ListByUser` | 分页过滤 |
-| ☐ | `handler.ProductHandler.List` | 补充分页参数 |
+| ☐ | `service`（可加 `ListOrders`）+ `repository.OrderRepo.ListByUser` | 分页过滤（repo 已有，接 handler/service） |
+| ☐ | `handler.ProductHandler.List` | 分页已接；可再打磨 |
 | ☐ | `cmd/server/main.go` → `main` | `http.Server` + `SIGINT/SIGTERM` + `Shutdown` |
+| ☐ | （可选）`PlaceOrder` 清空购物车 | 阶段 B 未做 |
 
 **验收：** 响应带 `X-Request-ID`；订单列表可分页；`Ctrl+C` 优雅退出。
 
@@ -80,10 +84,10 @@
 | 状态 | 目录 / 符号 | 要做什么 |
 |------|-------------|----------|
 | ☐ | `scripts/oversell_demo.sh` | 填好 TOKEN / PRODUCT_ID 后并发打 |
-| ☐ | `repository.ProductRepo.DeductStockTx` | `FOR UPDATE` 或 `UPDATE ... WHERE stock>=?` + `RowsAffected` |
-| ☐ | `service.OrderService.PlaceOrder` | 确保全程同一 `tx`，失败回滚 |
+| ⚠️ | `repository.ProductRepo.DeductStockTx` | 已有 `FOR UPDATE`；阶段 E 用脚本压测确认 |
+| ⚠️ | `service.OrderService.PlaceOrder` | 已用同一 `tx`；压测验证不超卖 |
 
-**验收：** 修复前能超卖；修复后再跑脚本库存不错乱。
+**验收：** 并发下单后库存与订单数量一致、不超卖。
 
 ---
 
@@ -100,8 +104,6 @@
 
 ## 建议实现顺序（按调用链）
 
-每做一个 API，通常一次打通三层：
-
 ```text
 NewRouter 挂路由
   → Handler（Gin 读请求、写响应）
@@ -109,5 +111,4 @@ NewRouter 挂路由
       → Repository（SQL/GORM）
 ```
 
-可选工具包（阶段 C）：`internal/auth/*`  
-可选中间件（C/D）：`internal/middleware/*`
+下一阶段重点：`internal/auth/*` + `middleware.JWTAuth` + 路由分组鉴权。

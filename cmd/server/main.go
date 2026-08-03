@@ -28,16 +28,22 @@ func main() {
 		log.Fatal(err)
 	}
 
+	cartRepo := repository.CartRepo{DB: db}
+	orderRepo := repository.OrderRepo{DB: db}
 	productRepo := repository.ProductRepo{DB: db}
 	if err := productRepo.AutoMigrate(); err != nil {
 		log.Fatal(err)
 	}
 	catalogSvc := &service.CatalogService{Products: &productRepo}
+	cartSvc := &service.CartService{Carts: &cartRepo, Products: &productRepo}
+	orderSvc := &service.OrderService{DB: db, Products: &productRepo, Carts: &cartRepo, Orders: &orderRepo}
 
 	// TODO(3.1): 组装 repository → service → handler.Deps
 	r := handler.NewRouter(handler.Deps{
 		JWTSecret: cfg.JWTSecret,
 		Catalog:   catalogSvc,
+		Cart:      cartSvc,
+		Order:     orderSvc,
 		// Auth / Catalog / Cart / Order 自己注入
 	})
 

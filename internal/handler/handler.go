@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"e_commerce_platform/internal/model"
 	"e_commerce_platform/internal/response"
 	"e_commerce_platform/internal/service"
 
@@ -80,14 +81,57 @@ type CartHandler struct{ Svc *service.CartService }
 
 func (h *CartHandler) Add(c *gin.Context) {
 	// TODO(3.2): 从 context 取 userID，bind product_id/quantity → Svc.Add
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: CartAdd")
+	userid := uint(1)
+	// if err != nil {
+	// 	response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+	// 	return
+	// }
+
+	var req struct {
+		ProductID uint `json:"product_id" binding:"required"`
+		Quantity  int  `json:"quantity" binding:"required,min=1"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+	if err := h.Svc.Add(c.Request.Context(), uint(userid), req.ProductID, req.Quantity); err != nil {
+		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	response.OK(c, gin.H{"ok": true})
 }
 
 type OrderHandler struct{ Svc *service.OrderService }
 
 func (h *OrderHandler) Place(c *gin.Context) {
 	// TODO(3.1/B): bind items → Svc.PlaceOrder（事务扣库存）
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: PlaceOrder")
+	userID := uint(1)
+	var req struct {
+		Items []struct {
+			ProductID uint `json:"product_id" binding:"required"`
+			Quantity  int  `json:"quantity" binding:"required,min=1"`
+		} `json:"items" binding:"required,min=1"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		return
+	}
+
+	items := make([]service.OrderLine, 0, len(req.Items))
+	for _, item := range req.Items {
+		items = append(items, service.OrderLine{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+		})
+	}
+	o, err := h.Svc.PlaceOrder(c.Request.Context(), userID, items)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		return
+	}
+	response.OK(c, o)
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
@@ -97,5 +141,26 @@ func (h *OrderHandler) List(c *gin.Context) {
 
 func (h *OrderHandler) Transition(c *gin.Context) {
 	// TODO(3.2): 校验订单归属 + 状态机 → Svc.Transition
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO: Transition")
+	userID := uint(1)
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, 40001, "Invalid id")
+		return
+	}
+
+	var req struct {
+		Status model.OrderStatus `json:"status" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusForbidden, 40001, err.Error())
+		return
+	}
+
+	if err := h.Svc.Transition(c.Request.Context(), userID, uint(id), req.Status); err != nil {
+		response.Fail(c, http.StatusForbidden, 40301, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{"ok": true})
 }

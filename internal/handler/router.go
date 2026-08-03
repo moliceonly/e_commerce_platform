@@ -23,6 +23,8 @@ func NewRouter(d Deps) *gin.Engine {
 
 	r.GET("/healthz", Healthz)
 	prodH := &ProductHandler{Svc: d.Catalog}
+	cartH := &CartHandler{Svc: d.Cart}
+	orderH := &OrderHandler{Svc: d.Order}
 
 	_ = d // 装配 Auth/Catalog/Cart/Order handler 后挂到下面分组
 
@@ -31,6 +33,9 @@ func NewRouter(d Deps) *gin.Engine {
 		v1.GET("/products", prodH.List)
 		v1.GET("/products/:id", prodH.Get)
 		v1.POST("/products", prodH.Create)
+		v1.POST("/cart/items", cartH.Add)
+		v1.POST("/orders", orderH.Place)
+		v1.POST("/orders/:id/transition", orderH.Transition)
 	}
 	// TODO(3.2): POST /auth/register, /auth/login
 	// TODO(3.2): 需登录组 + middleware.JWTAuth(d.JWTSecret)
