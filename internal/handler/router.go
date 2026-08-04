@@ -19,9 +19,11 @@ type Deps struct {
 // NewRouter 注册路由分组。先保证 /healthz；其余自己挂。
 func NewRouter(d Deps) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Recovery(), gin.Logger())
+	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
-	// TODO(3.3): r.Use(middleware.RequestID())
+	// TODO(G): 实现 AccessLog 后打开；可暂时保留 gin.Logger()
+	r.Use(middleware.AccessLog())
+	// r.Use(gin.Logger())
 
 	r.GET("/healthz", Healthz)
 	prodH := &ProductHandler{Svc: d.Catalog}

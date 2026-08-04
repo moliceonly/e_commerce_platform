@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"e_commerce_platform/internal/auth"
+	"e_commerce_platform/internal/cache"
 	"e_commerce_platform/internal/model"
 	"e_commerce_platform/internal/repository"
 
@@ -14,7 +15,8 @@ import (
 
 // CatalogService 商品。
 type CatalogService struct {
-	Products *repository.ProductRepo
+	Products repository.ProductStore // 接口：便于 mock
+	Cache    cache.Cache             // 可选；阶段 G 接入 Redis
 }
 
 func (s *CatalogService) CreateProduct(ctx context.Context, name string, price int64, stock int) (*model.Product, error) {
@@ -23,22 +25,30 @@ func (s *CatalogService) CreateProduct(ctx context.Context, name string, price i
 		Price: price,
 		Stock: stock,
 	}
-	return &product, s.Products.Create(ctx, &product)
+	if err := s.Products.Create(ctx, &product); err != nil {
+		return nil, err
+	}
+	// TODO(G): 写库成功后删列表缓存 s.Cache.Del(ctx, cache.ProductsPageKey(...))
+	return &product, nil
 }
 
 func (s *CatalogService) GetProduct(ctx context.Context, id uint) (*model.Product, error) {
+	// TODO(G): 先查 Redis cache.ProductKey(id)；未命中再 Products.Get，回填 Set
+	// applog.FromContext(ctx).Info("get product", "id", id)
 	return s.Products.Get(ctx, id)
 }
 
 func (s *CatalogService) ListProducts(ctx context.Context, page, pageSize int) ([]model.Product, error) {
+	// TODO(G): 可选短缓存 cache.ProductsPageKey(page, pageSize)
 	offset := (page - 1) * pageSize
 	return s.Products.List(ctx, offset, pageSize)
 }
 
 // AuthService 注册登录。
 type AuthService struct {
-	Users     *repository.UserRepo
+	Users     repository.UserStore
 	JWTSecret string
+	Cache     cache.Cache // TODO(G): 登录失败计数 / token 黑名单（可选）
 }
 
 func (s *AuthService) Register(ctx context.Context, email, password string) (*model.User, error) {
@@ -79,8 +89,9 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (token 
 
 // CartService 加购。
 type CartService struct {
-	Carts    *repository.CartRepo
-	Products *repository.ProductRepo
+	Carts    repository.CartStore
+	Products repository.ProductStore
+	Cache    cache.Cache // TODO(G): 加购后刷新/删除 cart:{userID}
 }
 
 func (s *CartService) Add(ctx context.Context, userID, productID uint, qty int) error {
@@ -89,16 +100,21 @@ func (s *CartService) Add(ctx context.Context, userID, productID uint, qty int) 
 		return fmt.Errorf("product not exists")
 	}
 
-	return s.Carts.Upsert(ctx, userID, productID, qty)
+	if err := s.Carts.Upsert(ctx, userID, productID, qty); err != nil {
+		return err
+	}
+	// TODO(G): s.Cache.Del(ctx, cache.CartKey(userID))
+	return nil
 
 }
 
 // OrderService 下单与状态流转。
 type OrderService struct {
 	DB       *gorm.DB
-	Products *repository.ProductRepo
-	Orders   *repository.OrderRepo
-	Carts    *repository.CartRepo
+	Products repository.ProductStore
+	Orders   repository.OrderStore
+	Carts    repository.CartStore
+	Cache    cache.Cache // TODO(G): 下单成功后失效 product:{id} / cart:{userID}
 }
 
 // OrderLine 下单行入参。
@@ -160,6 +176,10 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 	if err != nil {
 		return nil, err
 	}
+	// TODO(G): 事务成功后失效缓存
+	// for _, id := range productIDs { _ = s.Cache.Del(ctx, cache.ProductKey(id)) }
+	// _ = s.Cache.Del(ctx, cache.CartKey(userID))
+	// applog.FromContext(ctx).Info("place order ok", "order_id", order.ID, "user_id", userID)
 	return order, nil
 
 }

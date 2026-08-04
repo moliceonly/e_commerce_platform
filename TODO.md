@@ -2,7 +2,7 @@
 
 依赖方向：**handler → service → repository**。
 
-**进度：阶段 A–F 全部完成（路线图 3.1–3.5 / Part 03）。**
+**进度：阶段 A–F 已完成；当前加练阶段 G（Redis / 接口 mock / 结构化日志）。**
 
 ---
 
@@ -86,11 +86,64 @@ sudo docker compose -f deployments/docker-compose.yml --profile test run --rm te
 
 ---
 
+## 阶段 G · 补强（Redis + 接口 mock + 结构化日志）← 当前
+
+骨架已生成，按表在对应文件填 TODO(G)。建议顺序：**G1 日志 → G2 接口 mock → G3 Redis**。
+
+### G1 · 结构化日志 + 全链路 request_id
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `internal/applog/applog.go` | 实现 `Setup` / `WithRequestID` / `RequestIDFrom` / `FromContext`（建议 `log/slog`） |
+| ☐ | `internal/middleware/middleware.go` → `RequestID` | `applog.WithRequestID` 写入 `c.Request.Context()` |
+| ☐ | `internal/middleware/middleware.go` → `AccessLog` | 请求结束后打 method/path/status/latency + request_id |
+| ☐ | `internal/handler/router.go` | 确认 `AccessLog` 在 `RequestID` 之后；可去掉 `gin.Logger` |
+| ☐ | `cmd/server/main.go` | 启动时调用 `applog.Setup(cfg.AppEnv)` |
+| ☐ | `internal/service/service.go`（关键路径） | `PlaceOrder` / `GetProduct` 等用 `applog.FromContext(ctx).Info(...)` |
+
+**验收：** `curl -i /healthz` 响应有 `X-Request-ID`；容器/终端日志每行带相同 `request_id`。
+
+### G2 · repository 接口 + service mock 单测
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `internal/repository/ports.go` | 已有 `ProductStore` / `OrderStore` / `CartStore` / `UserStore`（一般不用改） |
+| ☐ | `internal/service/service.go` | 字段已改为接口类型；确认编译通过 |
+| ☐ | `internal/service/catalog_mock_test.go` | 补全 `mockProductStore`；去掉 `t.Skip`；测 `GetProduct`/`CreateProduct` |
+| ☐ | （可选）同目录再加 `order_mock_test.go` | mock `ProductStore`+`OrderStore`+`CartStore` 测库存不足等 |
+
+**验收：** `go test ./internal/service/ -run Mock -count=1` 不连 MySQL 也能过。
+
+### G3 · Redis 缓存（不止下单读库）
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | 依赖 | `go get github.com/redis/go-redis/v9` |
+| ☐ | `internal/cache/redis.go` | 实现 `NewRedis` / `Get` / `Set` / `Del` / `Ping` |
+| ☐ | `cmd/server/main.go` | `cache.NewRedis(cfg.RedisAddr)`，注入各 Service 的 `Cache` 字段 |
+| ☐ | `CatalogService.GetProduct` | 读 `product:{id}` 缓存；未命中查库并回填 |
+| ☐ | `CatalogService.CreateProduct` / `ListProducts` | 写后删列表缓存；列表可选短 TTL |
+| ☐ | `CartService.Add` | 写后 `Del(cart:{userID})` |
+| ☐ | `OrderService.PlaceOrder` | 成功后失效相关 `product:{id}` 与 `cart:{userID}` |
+| ☐ | （可选）`AuthService.Login` | 失败次数限流或 token 黑名单 |
+
+**验收：** Compose 起 redis 后，连续两次 `GET /products/:id`，第二次可在日志/逻辑上体现命中缓存；改库存/下单后缓存被删掉。
+
+### 建议实现顺序
+
+```text
+G1 applog + RequestID 进 context + AccessLog
+  → G2 mockProductStore 单测
+    → G3 Redis 客户端 + 商品/购物车/下单失效
+```
+
+---
+
 ## 调用链
 
 ```text
-NewRouter
+NewRouter（RequestID → AccessLog）
   → Handler
-    → Service
-      → Repository
+    → Service（接口 Store + 可选 Cache；日志带 request_id）
+      → Repository 实现 / Redis
 ```

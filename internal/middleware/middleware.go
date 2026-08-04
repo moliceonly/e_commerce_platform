@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"e_commerce_platform/internal/applog"
 	"e_commerce_platform/internal/auth"
 	"e_commerce_platform/internal/response"
 
@@ -14,10 +15,9 @@ import (
 const CtxUserID = "userID"
 const CtxRequestID = "requestID"
 
-// RequestID 注入 request_id（3.3）。
+// RequestID 注入 request_id（3.3 / G：写入 context 供 slog 使用）。
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: 读 X-Request-ID 或生成 uuid，写入 context + 响应头
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
 			requestID = uuid.NewString()
@@ -25,6 +25,28 @@ func RequestID() gin.HandlerFunc {
 
 		c.Set(CtxRequestID, requestID)
 		c.Header("X-Request-ID", requestID)
+
+		// TODO(G): 把 request_id 放进标准 context，供 service 打日志
+		// ctx := applog.WithRequestID(c.Request.Context(), requestID)
+		// c.Request = c.Request.WithContext(ctx)
+		_ = applog.WithRequestID
+
+		c.Next()
+	}
+}
+
+// AccessLog 结构化访问日志（阶段 G），替代或补充 gin.Logger。
+func AccessLog() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// TODO(G):
+		//  start := time.Now()
+		//  c.Next()
+		//  applog.FromContext(c.Request.Context()).Info("http",
+		//    "method", c.Request.Method,
+		//    "path", c.Request.URL.Path,
+		//    "status", c.Writer.Status(),
+		//    "latency", time.Since(start).String(),
+		//  )
 		c.Next()
 	}
 }

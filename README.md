@@ -5,7 +5,7 @@
 - 阶段对照：[TODO.md](./TODO.md)
 - Gin 速查：[GIN.md](./GIN.md)
 
-**进度：阶段 A–F 全部完成（路线图 3.1–3.5）。**  
+**进度：阶段 A–F 完成；加练 G（Redis / 接口 mock / 结构化日志）见 [TODO.md](./TODO.md)。**  
 **运行方式以 Docker Compose 为准**（不要求本机安装 Go / MySQL）。
 
 ## 快速开始
