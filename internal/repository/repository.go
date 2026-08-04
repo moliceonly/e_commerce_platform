@@ -87,11 +87,6 @@ func (r *OrderRepo) ListByUser(ctx context.Context, userID uint, status string, 
 }
 
 func (r *OrderRepo) UpdateStatus(ctx context.Context, orderID uint, from, to model.OrderStatus) error {
-
-	if from == "" || to == "" {
-		return fmt.Errorf("Invalid status")
-	}
-
 	upd := r.DB.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status = ?", orderID, from).Update("status", to)
 	if upd.Error != nil {
 		return upd.Error

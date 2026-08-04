@@ -22,6 +22,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	// TODO(G): 实现 AccessLog 后打开；可暂时保留 gin.Logger()
+
 	r.Use(middleware.AccessLog())
 	// r.Use(gin.Logger())
 
@@ -30,8 +31,6 @@ func NewRouter(d Deps) *gin.Engine {
 	cartH := &CartHandler{Svc: d.Cart}
 	orderH := &OrderHandler{Svc: d.Order}
 	authH := &AuthHandler{Svc: d.Auth}
-
-	_ = d // 装配 Auth/Catalog/Cart/Order handler 后挂到下面分组
 
 	v1 := r.Group("/api/v1")
 	{

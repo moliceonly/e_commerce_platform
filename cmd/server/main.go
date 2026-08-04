@@ -28,7 +28,7 @@ func main() {
 	cfg := config.Load()
 
 	// TODO(G): applog.Setup(cfg.AppEnv)
-	_ = applog.Setup
+	applog.Setup(cfg.AppEnv)
 
 	mysqlDsn := cfg.MySQLDSN
 	if mysqlDsn == "" {

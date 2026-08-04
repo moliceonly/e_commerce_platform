@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"e_commerce_platform/internal/applog"
 	"e_commerce_platform/internal/auth"
 	"e_commerce_platform/internal/cache"
 	"e_commerce_platform/internal/model"
@@ -26,15 +27,17 @@ func (s *CatalogService) CreateProduct(ctx context.Context, name string, price i
 		Stock: stock,
 	}
 	if err := s.Products.Create(ctx, &product); err != nil {
+		applog.FromContext(ctx).Error("create product failed", "err", err.Error())
 		return nil, err
 	}
 	// TODO(G): 写库成功后删列表缓存 s.Cache.Del(ctx, cache.ProductsPageKey(...))
+	applog.FromContext(ctx).Info("create product ok", "id", product.ID, "name", name)
 	return &product, nil
 }
 
 func (s *CatalogService) GetProduct(ctx context.Context, id uint) (*model.Product, error) {
 	// TODO(G): 先查 Redis cache.ProductKey(id)；未命中再 Products.Get，回填 Set
-	// applog.FromContext(ctx).Info("get product", "id", id)
+	applog.FromContext(ctx).Info("get product", "id", id)
 	return s.Products.Get(ctx, id)
 }
 
@@ -71,7 +74,7 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*mo
 	if err := s.Users.Create(ctx, &user); err != nil {
 		return nil, err
 	}
-
+	applog.FromContext(ctx).Info("register ok", "user_id", user.ID, "email", email)
 	return &user, nil
 }
 
@@ -79,11 +82,14 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (token 
 	// TODO(3.2): FindByEmail + CheckPassword + SignToken
 	user, err := s.Users.FindByEmail(ctx, email)
 	if err != nil {
+		applog.FromContext(ctx).Warn("login failed", "email", email)
 		return "", fmt.Errorf("invalid email or password")
 	}
 	if !auth.CheckPassword(user.PasswordHash, password) {
+		applog.FromContext(ctx).Warn("login failed", "email", email)
 		return "", fmt.Errorf("invalid email or password")
 	}
+	applog.FromContext(ctx).Info("login ok", "user_id", user.ID)
 	return auth.SignToken(s.JWTSecret, user.ID, user.Role, 24*time.Hour)
 }
 
@@ -104,6 +110,7 @@ func (s *CartService) Add(ctx context.Context, userID, productID uint, qty int) 
 		return err
 	}
 	// TODO(G): s.Cache.Del(ctx, cache.CartKey(userID))
+	applog.FromContext(ctx).Info("cart add ok", "user_id", userID, "product_id", productID, "qty", qty)
 	return nil
 
 }
@@ -174,12 +181,13 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 	})
 
 	if err != nil {
+		applog.FromContext(ctx).Error("place order failed", "user_id", userID, "err", err.Error())
 		return nil, err
 	}
 	// TODO(G): 事务成功后失效缓存
 	// for _, id := range productIDs { _ = s.Cache.Del(ctx, cache.ProductKey(id)) }
 	// _ = s.Cache.Del(ctx, cache.CartKey(userID))
-	// applog.FromContext(ctx).Info("place order ok", "order_id", order.ID, "user_id", userID)
+	applog.FromContext(ctx).Info("place order ok", "order_id", order.ID, "user_id", userID)
 	return order, nil
 
 }
@@ -192,6 +200,7 @@ func (s *OrderService) Transition(ctx context.Context, userID, orderID uint, to 
 	}
 
 	if order.UserID != userID {
+		applog.FromContext(ctx).Warn("transition forbidden", "user_id", userID, "order_id", orderID)
 		return fmt.Errorf("User forbidden")
 	}
 
@@ -201,10 +210,17 @@ func (s *OrderService) Transition(ctx context.Context, userID, orderID uint, to 
 			ok = true
 		}
 	}
+
 	if !ok {
+		applog.FromContext(ctx).Warn("invalid transition", "order_id", orderID, "from", from, "to", to)
 		return fmt.Errorf("invalid transition %s -> %s", from, to)
 	}
-	return s.Orders.UpdateStatus(ctx, orderID, from, to)
+
+	if err := s.Orders.UpdateStatus(ctx, orderID, from, to); err != nil {
+		return err
+	}
+	applog.FromContext(ctx).Info("transition ok", "order_id", orderID, "from", from, "to", to)
+	return nil
 }
 
 // ListOrders 当前用户订单分页列表（可选 status 过滤）。
@@ -213,6 +229,7 @@ func (s *OrderService) ListOrders(ctx context.Context, userID uint, status strin
 	offset := (page - 1) * pageSize
 	q, err := s.Orders.ListByUser(ctx, userID, status, offset, pageSize)
 	if err != nil {
+		applog.FromContext(ctx).Error("list orders failed", "user_id", userID, "err", err.Error())
 		return nil, err
 	}
 	return q, nil

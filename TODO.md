@@ -99,7 +99,7 @@ sudo docker compose -f deployments/docker-compose.yml --profile test run --rm te
 | ☐ | `internal/middleware/middleware.go` → `AccessLog` | 请求结束后打 method/path/status/latency + request_id |
 | ☐ | `internal/handler/router.go` | 确认 `AccessLog` 在 `RequestID` 之后；可去掉 `gin.Logger` |
 | ☐ | `cmd/server/main.go` | 启动时调用 `applog.Setup(cfg.AppEnv)` |
-| ☐ | `internal/service/service.go`（关键路径） | `PlaceOrder` / `GetProduct` 等用 `applog.FromContext(ctx).Info(...)` |
+| ☐ | `internal/service/service.go`（关键路径） | `GetProduct` / `PlaceOrder` 等业务函数各 1～2 条 applog；repo 层不打 |
 
 **验收：** `curl -i /healthz` 响应有 `X-Request-ID`；容器/终端日志每行带相同 `request_id`。
 

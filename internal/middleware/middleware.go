@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"e_commerce_platform/internal/applog"
 	"e_commerce_platform/internal/auth"
@@ -27,9 +28,8 @@ func RequestID() gin.HandlerFunc {
 		c.Header("X-Request-ID", requestID)
 
 		// TODO(G): 把 request_id 放进标准 context，供 service 打日志
-		// ctx := applog.WithRequestID(c.Request.Context(), requestID)
-		// c.Request = c.Request.WithContext(ctx)
-		_ = applog.WithRequestID
+		ctx := applog.WithRequestID(c.Request.Context(), requestID)
+		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
@@ -39,15 +39,11 @@ func RequestID() gin.HandlerFunc {
 func AccessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO(G):
-		//  start := time.Now()
-		//  c.Next()
-		//  applog.FromContext(c.Request.Context()).Info("http",
-		//    "method", c.Request.Method,
-		//    "path", c.Request.URL.Path,
-		//    "status", c.Writer.Status(),
-		//    "latency", time.Since(start).String(),
-		//  )
+		start := time.Now()
 		c.Next()
+		applog.FromContext(c.Request.Context()).Info(
+			"http", "method", c.Request.Method, "path", c.Request.URL.Path, "status", c.Writer.Status(), "latency", time.Since(start).String(),
+		)
 	}
 }
 
