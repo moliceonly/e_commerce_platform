@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: training_lib
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     ports:
       - "6379:6379"
 
@@ -41,7 +41,7 @@ services:
   # 在容器内跑单测（连 compose 的 mysql）。用法见 README。
   test:
     profiles: ["test"]
-    image: golang:1.22-alpine
+    image: docker.m.daocloud.io/library/golang:1.24-alpine
     working_dir: /src
     volumes:
       - ..:/src

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // Cache 缓存端口（阶段 G · Redis）。
@@ -16,49 +18,82 @@ type Cache interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key, val string, ttl time.Duration) error
 	Del(ctx context.Context, keys ...string) error
+	// DelByPrefix 用 SCAN 删除匹配 prefix* 的 key（如商品列表页）。
+	DelByPrefix(ctx context.Context, prefix string) error
 	Ping(ctx context.Context) error
 }
 
 // RedisCache go-redis 封装骨架。
 // 依赖：go get github.com/redis/go-redis/v9
 type RedisCache struct {
-	// Client *redis.Client // TODO(G): 填入客户端
-	Addr string
+	Client *redis.Client // TODO(G): 填入客户端
+	Addr   string
 }
 
 // NewRedis 连接 Redis。addr 形如 127.0.0.1:6379 或 redis:6379。
 func NewRedis(addr string) (*RedisCache, error) {
 	// TODO(G):
-	//  rdb := redis.NewClient(&redis.Options{Addr: addr})
-	//  if err := rdb.Ping(ctx).Err(); err != nil { return nil, err }
-	//  return &RedisCache{Client: rdb, Addr: addr}, nil
 	_ = addr
-	return nil, fmt.Errorf("TODO(G): cache.NewRedis not implemented")
+	rdb := redis.NewClient(&redis.Options{Addr: addr})
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		return nil, err
+	}
+	return &RedisCache{Client: rdb, Addr: addr}, nil
 }
 
 func (c *RedisCache) Get(ctx context.Context, key string) (string, error) {
-	// TODO(G): return c.Client.Get(ctx, key).Result()；区分 redis.Nil
-	return "", fmt.Errorf("TODO(G): RedisCache.Get")
+	val, err := c.Client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil // miss：对业务层当空串，不算错误
+	}
+	return val, err
 }
 
 func (c *RedisCache) Set(ctx context.Context, key, val string, ttl time.Duration) error {
-	// TODO(G): return c.Client.Set(ctx, key, val, ttl).Err()
-	return fmt.Errorf("TODO(G): RedisCache.Set")
+	return c.Client.Set(ctx, key, val, ttl).Err()
 }
 
 func (c *RedisCache) Del(ctx context.Context, keys ...string) error {
-	// TODO(G): return c.Client.Del(ctx, keys...).Err()
-	return fmt.Errorf("TODO(G): RedisCache.Del")
+	if len(keys) == 0 {
+		return nil
+	}
+	return c.Client.Del(ctx, keys...).Err()
+}
+
+func (c *RedisCache) DelByPrefix(ctx context.Context, prefix string) error {
+	var cursor uint64
+	pattern := prefix + "*"
+	for {
+		keys, next, err := c.Client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := c.Client.Del(ctx, keys...).Err(); err != nil {
+				return err
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			break
+		}
+	}
+	return nil
 }
 
 func (c *RedisCache) Ping(ctx context.Context) error {
-	// TODO(G): return c.Client.Ping(ctx).Err()
-	return fmt.Errorf("TODO(G): RedisCache.Ping")
+	return c.Client.Ping(ctx).Err()
 }
 
 // 常用 key 约定（可按需改）。
-func ProductKey(id uint) string          { return fmt.Sprintf("product:%d", id) }
+func ProductKey(id uint) string { return fmt.Sprintf("product:%d", id) }
+
+// ProductsPagePrefix 列表缓存前缀，Create 后可用 DelByPrefix 清掉所有分页。
+const ProductsPagePrefix = "products:page:"
+const MaxFail = 5
+
 func ProductsPageKey(page, size int) string {
-	return fmt.Sprintf("products:page:%d:size:%d", page, size)
+	return fmt.Sprintf("%s%d:size:%d", ProductsPagePrefix, page, size)
 }
-func CartKey(userID uint) string { return fmt.Sprintf("cart:%d", userID) }
+func CartKey(userID uint) string  { return fmt.Sprintf("cart:%d", userID) }
+func FailKey(email string) string { return fmt.Sprintf("login:fail:%s", email) }

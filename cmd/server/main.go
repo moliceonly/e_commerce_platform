@@ -40,9 +40,10 @@ func main() {
 	}
 
 	// TODO(G): rdb, err := cache.NewRedis(cfg.RedisAddr)；失败则 log.Fatal 或降级 nil
-	var rdb cache.Cache
-	_ = cache.NewRedis
-	_ = rdb
+	rdb, err := cache.NewRedis(cfg.RedisAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	cartRepo := repository.CartRepo{DB: db}
 	orderRepo := repository.OrderRepo{DB: db}
