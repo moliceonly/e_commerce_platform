@@ -26,6 +26,8 @@ import (
 // 按 README 阶段 A→F 自己补：MySQL/GORM、Redis、优雅停机等。
 func main() {
 	cfg := config.Load()
+	// TODO(H1): 若实现了 LoadYAML，可改为：
+	//  cfg, err := config.LoadYAML(getenv APP_ENV); env 覆盖
 
 	// TODO(G): applog.Setup(cfg.AppEnv)
 	applog.Setup(cfg.AppEnv)
@@ -66,7 +68,9 @@ func main() {
 	})
 
 	log.Printf("listening on %s env=%s", cfg.HTTPAddr, cfg.AppEnv)
-	// TODO(3.3): 换成 http.Server + ListenAndServe + SIGTERM 优雅停机
+	// TODO(H3): jobs := &job.Runner{Interval: time.Minute}; jobs.Start(context.Background())
+	// TODO(H3): defer jobs.Stop()
+
 	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: r}
 	go srv.ListenAndServe()
 

@@ -1,0 +1,45 @@
+# 阶段 H · 3.5 CI 骨架：test → lint → docker build
+# 按需取消注释 lint；首次需仓库 Settings 允许 Actions。
+
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: test
+        run: |
+          # TODO(H5): 若单测依赖 MySQL，改用 service container 或跳过集成测
+          go test ./internal/auth/ ./internal/service/ -count=1
+        env:
+          GOPROXY: https://goproxy.cn,direct
+
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-go@v5
+  #       with:
+  #         go-version: "1.24"
+  #     - name: golangci-lint
+  #       uses: golangci/golangci-lint-action@v6
+  #       with:
+  #         version: latest
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -f deployments/Dockerfile -t e_commerce_platform:ci .
+        # TODO(H5): 需要时 login + push 到 registry

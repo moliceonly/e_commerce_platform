@@ -4,6 +4,10 @@
 /bin/
 /dist/
 configs/config.local.yaml
+configs/config.staging.yaml
+configs/config.prod.yaml
+data/uploads/*
+!data/uploads/.gitkeep
 .env
 .idea/
 .vscode/

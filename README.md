@@ -5,7 +5,7 @@
 - 阶段对照：[TODO.md](./TODO.md)
 - Gin 速查：[GIN.md](./GIN.md)
 
-**进度：阶段 A–G 完成**（含 Redis 缓存、接口 mock、结构化日志）。  
+**进度：阶段 A–G 完成；当前 [阶段 H](./TODO.md)（Part 03 知识点补齐：配置/RBAC/上传/CI 等）。**  
 **运行方式以 Docker Compose 为准**（不要求本机安装 Go / MySQL）。
 
 ## 快速开始
@@ -223,6 +223,7 @@ deployments/          # Dockerfile、docker-compose.yml
 | E　　| 3.5　　　　| 超卖压测　　　　　　　　　　　 | ✅　　|
 | F　　| 3.4 + 部署 | 单测、Docker　　　　　　　　　 | ✅　　|
 | G　　| 加练　　　 | slog、接口 mock、Redis 缓存　　 | ✅　　|
+| H　　| Part03 补齐 | Viper/RBAC/上传/lint/metrics/CI | ☐　　|
 
 ## 订单状态
 

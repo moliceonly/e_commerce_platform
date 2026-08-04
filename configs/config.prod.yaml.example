@@ -1,0 +1,8 @@
+# 生产环境示例（密钥只走环境变量 / KMS，不要提交真实值）
+app_env: prod
+http_addr: ":8080"
+mysql_dsn: "CHANGE_ME"
+redis_addr: "redis:6379"
+jwt_secret: "CHANGE_ME_USE_ENV"
+
+# TODO(H1): prod 关闭 pprof、收紧 CORS 等

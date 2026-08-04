@@ -1,0 +1,35 @@
+openapi: 3.0.3
+info:
+  title: e_commerce_platform API
+  version: 0.1.0
+  description: |
+    阶段 H · 3.3 OpenAPI 骨架。实现时可改用 swag 注解生成。
+    浏览：可用 Swagger UI 或 IDE 插件打开本文件。
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /healthz:
+    get:
+      summary: 探活
+      responses:
+        "200":
+          description: ok
+  /api/v1/auth/login:
+    post:
+      summary: 登录
+      # TODO(H3): requestBody / responses
+      responses:
+        "200":
+          description: token
+  /api/v1/products:
+    get:
+      summary: 商品列表
+      responses:
+        "200":
+          description: list
+    post:
+      summary: 创建商品（建议 admin）
+      responses:
+        "200":
+          description: created
+  # TODO(H3): /products/{id} /cart/items /orders /me/avatar /auth/refresh

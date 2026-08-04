@@ -1,0 +1,8 @@
+# 预发环境示例（勿填真实生产密钥）
+app_env: staging
+http_addr: ":8080"
+mysql_dsn: "CHANGE_ME"
+redis_addr: "redis:6379"
+jwt_secret: "CHANGE_ME_STAGING"
+
+# TODO(H1): staging 专用项

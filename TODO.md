@@ -2,7 +2,7 @@
 
 依赖方向：**handler → service → repository**。
 
-**进度：阶段 A–G 已完成。**
+**进度：阶段 A–G 已完成；当前加练阶段 H（Part 03 知识点补齐）。**
 
 ---
 
@@ -129,11 +129,88 @@ sudo docker compose -f deployments/docker-compose.yml --profile test run --rm te
 
 ---
 
+## 阶段 H · Part 03 知识点补齐 ← 当前
+
+对照 [`go-web-roadmap.html`](../go-web-roadmap.html) Part 03 知识要点，在 **不推倒 A–G** 的前提下补齐缺口。  
+骨架已生成（函数多返回 `TODO(H)` / 501 / 空实现），按表自己填。建议顺序：**H1 → H2 → H3 → H4 → H5**。
+
+### H1 · 3.1 配置与错误码
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `configs/*.yaml` | 补全 local / staging / prod 示例字段 |
+| ☐ | `internal/config/viper.go` → `LoadYAML` | `go get github.com/spf13/viper`；读 yaml，**env 覆盖文件** |
+| ☐ | `cmd/server/main.go` | 可选：`APP_CONFIG` 或按 `APP_ENV` 切到 `LoadYAML` |
+| ☐ | `internal/errcode/errcode.go` | 统一业务错误码常量；handler 逐步改用 |
+
+**验收：** 不改代码只换 `configs/config.staging.yaml` + env 覆盖 JWT，进程能读到新值。
+
+### H2 · 3.2 安全增强（RBAC / CORS / Refresh）
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `internal/middleware/cors.go` | 按环境放行 Origin；生产勿 `*` + Credential |
+| ☐ | `internal/middleware/rbac.go` → `RequireRole` | JWT 解析后校验 `role`；无权限 403 |
+| ☐ | `middleware.JWTAuth` | `c.Set(CtxRole, claims.Role)`（配合 RBAC） |
+| ☐ | `internal/auth/refresh.go` | 短 access + 长 refresh；`Refresh` 换发 access |
+| ☐ | `handler` / `router` | `POST /auth/refresh`；`POST /products` 可挂 `RequireRole("admin")` |
+| ☐ | （可选）文档笔记 | CSRF / XSS / 密钥不进仓（README 安全小节即可） |
+
+**验收：** 普通 `user` 调创建商品返回 403；admin 成功；refresh 可换新 access。
+
+### H3 · 3.3 上传 / 异步 / OpenAPI
+
+| 状态 | 去哪里实现　　　　　　　　　　　　　　　　　　　　 | 要做什么　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
+| ------| ----------------------------------------------------| ----------------------------------------------------------------|
+| ☐　　| `internal/service/upload.go` + `handler/upload.go` | multipart 存 `data/uploads/`，返回可访问 URL　　　　　　　　　 |
+| ☐　　| `router`　　　　　　　　　　　　　　　　　　　　　 | `POST /api/v1/me/avatar`（需登录）；`GET /static/*` 或专用下载 |
+| ☐　　| `internal/job/job.go`　　　　　　　　　　　　　　　| 启动后台 goroutine：例如每分钟扫超时未支付订单（可先打日志）　 |
+| ☐　　| `cmd/server/main.go`　　　　　　　　　　　　　　　 | `job.Start(...)`；Shutdown 时 `job.Stop`　　　　　　　　　　　 |
+| ☐　　| `docs/openapi.yaml` 或 swag　　　　　　　　　　　　| 手写 OpenAPI 最小集，或 `swag init` 生成 `/swagger/*`　　　　　|
+
+**验收：** 上传头像后能用返回 URL 访问文件；进程日志出现 job tick；Swagger/OpenAPI 能打开或被 raw 查看。
+
+### H4 · 3.4 Lint / Metrics / pprof
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `.golangci.yml` | 启用 govet / errcheck / staticcheck 等；本地 `golangci-lint run` 清告警 |
+| ☐ | `Makefile` → `lint` | 封装 lint 命令 |
+| ☐ | `internal/metrics/metrics.go` | `go get` prometheus client；请求计数/延迟直方图；`GET /metrics` |
+| ☐ | `internal/observability/pprof.go` | 非 prod 挂载 `/debug/pprof/*` |
+| ☐ | （可选）集成测试 | testcontainers 或 compose profile 已有则补 1 条关键路径 |
+
+**验收：** `make lint` 通过；`/metrics` 有数据；本机 `go tool pprof` 能连上。
+
+### H5 · 3.5 CI + Nginx
+
+| 状态 | 去哪里实现 | 要做什么 |
+|------|------------|----------|
+| ☐ | `.github/workflows/ci.yml` | test → lint → docker build（可不 push） |
+| ☐ | `deployments/nginx.conf.example` | 反代 `app:8080`；转发 `X-Request-ID` |
+| ☐ | `deployments/docker-compose.yml` | （可选）增加 `nginx` 服务 profile |
+| ☐ | `docs/runbook.md` | 排障：日志 → metrics → 慢 SQL / Redis → pprof |
+
+**验收：** PR/push 能跑 CI 绿；浏览器/ curl 经 Nginx 访问 healthz 成功。
+
+### 建议实现顺序
+
+```text
+H1 Viper 多环境配置 + errcode
+  → H2 CORS + CtxRole + RequireRole + Refresh
+    → H3 头像上传 + job + OpenAPI
+      → H4 lint + metrics + pprof
+        → H5 CI + Nginx + runbook
+```
+
+---
+
 ## 调用链
 
 ```text
-NewRouter（RequestID → AccessLog）
-  → Handler
-    → Service（接口 Store + 可选 Cache；日志带 request_id）
-      → Repository 实现 / Redis
+NewRouter（RequestID → AccessLog → CORS）
+  → Handler（含 upload / refresh / swagger）
+    → Service（接口 Store + Cache；日志带 request_id）
+      → Repository / Redis
+  (+ job 后台；/metrics /debug/pprof)
 ```
