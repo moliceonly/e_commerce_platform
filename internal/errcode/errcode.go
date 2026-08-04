@@ -6,7 +6,6 @@ package errcode
 const (
 	OK = 0
 
-	// 通用
 	ErrBadRequest   = 40000
 	ErrUnauthorized = 40100
 	ErrForbidden    = 40300
@@ -14,8 +13,9 @@ const (
 	ErrConflict     = 40900
 	ErrInternal     = 50000
 
-	// TODO(H1): 按域细分，例如
-	// ErrAuthInvalidCreds = 40101
-	// ErrAuthRateLimited  = 40102
-	// ErrStockNotEnough   = 40901
+	ErrAuthInvalidCreds = 40101
+	ErrAuthRateLimited  = 40102
+	ErrAuthTokenExpired = 40103
+	ErrStockNotEnough   = 40901
+	ErrNotImplemented   = 50100
 )

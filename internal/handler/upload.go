@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"e_commerce_platform/internal/errcode"
 	"e_commerce_platform/internal/middleware"
 	"e_commerce_platform/internal/response"
 	"e_commerce_platform/internal/service"
@@ -20,7 +21,7 @@ func (h *UploadHandler) Avatar(c *gin.Context) {
 	//  fh, err := c.FormFile("file")
 	//  url, err := h.Svc.SaveAvatar(...)
 	_ = middleware.CtxUserID
-	response.Fail(c, http.StatusNotImplemented, 50100, "TODO(H3): avatar upload")
+	response.Fail(c, http.StatusNotImplemented, errcode.ErrNotImplemented, "TODO(H3): avatar upload")
 }
 
 // AuthRefreshHandler Token 刷新（阶段 H · 3.2）。
@@ -31,5 +32,5 @@ type AuthRefreshHandler struct {
 
 func (h *AuthRefreshHandler) Refresh(c *gin.Context) {
 	// TODO(H2): bind refresh_token → auth.RefreshAccessToken → OK({token})
-	response.Fail(c, http.StatusNotImplemented, 50101, "TODO(H2): refresh token")
+	response.Fail(c, http.StatusNotImplemented, errcode.ErrNotImplemented, "TODO(H2): refresh token")
 }

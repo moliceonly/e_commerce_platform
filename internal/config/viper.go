@@ -1,20 +1,40 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
 
-// LoadYAML 按环境读 configs/config.{env}.yaml（阶段 H · 3.1）。
-// 约定：文件提供默认值，同名环境变量覆盖文件。
-//
-// 依赖（实现时执行）：
-//
-//	go get github.com/spf13/viper
-//
-// 提示：
-//   - SetConfigFile / AddConfigPath("configs")
-//   - AutomaticEnv + SetEnvKeyReplacer
-//   - Unmarshal 到 Config
+	"github.com/spf13/viper"
+)
+
 func LoadYAML(env string) (Config, error) {
 	// TODO(H1): 用 viper 加载 configs/config.<env>.yaml，再用 env 覆盖
-	_ = env
-	return Config{}, fmt.Errorf("TODO(H1): LoadYAML with viper not implemented")
+	if env == "" {
+		env = "local"
+	}
+
+	v := viper.New()
+	v.SetConfigFile(fmt.Sprintf("configs/config.%s.yaml", env))
+	v.SetConfigType("yaml")
+
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+	_ = v.BindEnv("app_env", "APP_ENV")
+	_ = v.BindEnv("http_addr", "HTTP_ADDR")
+	_ = v.BindEnv("mysql_dsn", "MYSQL_DSN")
+	_ = v.BindEnv("redis_addr", "REDIS_ADDR")
+	_ = v.BindEnv("jwt_secret", "JWT_SECRET")
+
+	if err := v.ReadInConfig(); err != nil {
+		return Config{}, fmt.Errorf("read config: %w", err)
+	}
+
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+	}
+	if cfg.AppEnv == "" {
+		cfg.AppEnv = env
+	}
+	return cfg, nil
 }

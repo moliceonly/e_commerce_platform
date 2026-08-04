@@ -142,13 +142,13 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*mo
 	return &user, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (token string, err error) {
+func (s *AuthService) Login(ctx context.Context, email, password string) (token string, refresh string, err error) {
 	// TODO(3.2): FindByEmail + CheckPassword + SignToken
 	failKey := cache.FailKey(email)
 	if s.Cache != nil {
 		if raw, err := s.Cache.Get(ctx, failKey); err == nil && raw != "" {
 			if redisCount, err := strconv.Atoi(raw); err == nil && redisCount >= cache.MaxFail {
-				return "", fmt.Errorf("too many login tries, try 60 seconds later")
+				return "", "", fmt.Errorf("too many login tries, try 60 seconds later")
 			}
 		}
 	}
@@ -167,7 +167,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (token 
 			}
 		}
 		applog.FromContext(ctx).Warn("login failed", "email", email)
-		return "", fmt.Errorf("invalid email or password")
+		return "", "", fmt.Errorf("invalid email or password")
 	}
 
 	if s.Cache != nil {
@@ -176,7 +176,25 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (token 
 		}
 	}
 	applog.FromContext(ctx).Info("login ok", "user_id", user.ID)
-	return auth.SignToken(s.JWTSecret, user.ID, user.Role, 24*time.Hour)
+	access, err := auth.SignToken(s.JWTSecret, user.ID, user.Role, 24*time.Hour)
+	if err != nil {
+		return "", "", err
+	}
+	refresh, err = auth.SignRefreshToken(s.JWTSecret, user.ID, user.Role, 7*24*time.Hour)
+	if err != nil {
+		return "", "", err
+	}
+	return access, refresh, nil
+}
+
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (access string, err error) {
+	access, err = auth.RefreshAccessToken(s.JWTSecret, refreshToken, 24*time.Hour)
+	if err != nil {
+		applog.FromContext(ctx).Warn("refresh failed", "err", err.Error())
+		return "", err
+	}
+	applog.FromContext(ctx).Info("refresh ok")
+	return access, nil
 }
 
 // CartService 加购。

@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	"e_commerce_platform/internal/errcode"
 	"e_commerce_platform/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -18,9 +19,19 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 		// TODO(H2):
 		//  role := c.GetString(CtxRole)
 		//  若不在 roles 内：Fail 403 + Abort
-		_ = roles
-		_ = http.StatusForbidden
-		_ = response.Fail
+		role, ok := c.GetString(CtxRole), false
+		for _, r := range roles {
+			if role == r {
+				ok = true
+				break
+			}
+		}
+
+		if !ok {
+			response.Fail(c, http.StatusForbidden, errcode.ErrForbidden, "forbidden role")
+			c.Abort()
+			return
+		}
 		// 骨架阶段先放行，避免未接线时误伤；实现后删掉 Next 前的「默认放行」注释。
 		c.Next()
 	}

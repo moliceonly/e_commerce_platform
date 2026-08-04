@@ -25,11 +25,16 @@ import (
 // 入口：读配置 → 组装依赖 → 起 HTTP。
 // 按 README 阶段 A→F 自己补：MySQL/GORM、Redis、优雅停机等。
 func main() {
-	cfg := config.Load()
-	// TODO(H1): 若实现了 LoadYAML，可改为：
-	//  cfg, err := config.LoadYAML(getenv APP_ENV); env 覆盖
 
-	// TODO(G): applog.Setup(cfg.AppEnv)
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "local"
+	}
+	cfg, err := config.LoadYAML(env)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	applog.Setup(cfg.AppEnv)
 
 	mysqlDsn := cfg.MySQLDSN

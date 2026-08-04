@@ -7,6 +7,7 @@ import (
 
 	"e_commerce_platform/internal/applog"
 	"e_commerce_platform/internal/auth"
+	"e_commerce_platform/internal/errcode"
 	"e_commerce_platform/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -53,7 +54,7 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		// TODO: Authorization: Bearer ... → auth.ParseToken → c.Set(CtxUserID, ...)
 		h := c.GetHeader("Authorization")
 		if !strings.HasPrefix(h, "Bearer") {
-			response.Fail(c, http.StatusUnauthorized, 40100, "missing bearer token")
+			response.Fail(c, http.StatusUnauthorized, errcode.ErrAuthTokenExpired, "missing bearer token")
 			c.Abort()
 			return
 		}
@@ -61,13 +62,13 @@ func JWTAuth(secret string) gin.HandlerFunc {
 
 		claims, err := auth.ParseToken(secret, tokenStr)
 		if err != nil {
-			response.Fail(c, http.StatusUnauthorized, 40101, "invalid token")
+			response.Fail(c, http.StatusUnauthorized, errcode.ErrAuthInvalidCreds, "invalid token")
 			c.Abort()
 			return
 		}
 
 		c.Set(CtxUserID, claims.UserID)
-		// TODO(H2): c.Set(CtxRole, claims.Role)
+		c.Set(CtxRole, claims.Role)
 		c.Next()
 	}
 }

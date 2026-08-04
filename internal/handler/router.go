@@ -22,7 +22,8 @@ func NewRouter(d Deps) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
-	// TODO(H2): r.Use(middleware.CORS([]string{"http://localhost:3000"}))
+	r.Use(middleware.RequireRole())
+	r.Use(middleware.CORS([]string{"http://localhost:3000"}))
 	// TODO(H4): r.Use(metrics.Middleware()) ; metrics.Register(r)
 	// TODO(H4): observability.MountPprof(r, cfg.AppEnv != "prod")
 
@@ -39,10 +40,10 @@ func NewRouter(d Deps) *gin.Engine {
 		v1.GET("/products", prodH.List)
 		v1.GET("/products/:id", prodH.Get)
 		v1.POST("/products", prodH.Create)
-		// TODO(H2): v1.POST("/products", middleware.JWTAuth(d.JWTSecret), middleware.RequireRole("admin"), prodH.Create)
+		v1.POST("/products", middleware.JWTAuth(d.JWTSecret), middleware.RequireRole("admin"), prodH.Create)
 		v1.POST("/auth/register", authH.Register)
 		v1.POST("/auth/login", authH.Login)
-		// TODO(H2): v1.POST("/auth/refresh", refreshH.Refresh)
+		v1.POST("/auth/refresh", authH.Refresh)
 	}
 
 	authz := v1.Group("")

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"e_commerce_platform/internal/errcode"
 	"e_commerce_platform/internal/model"
 	"e_commerce_platform/internal/response"
 	"e_commerce_platform/internal/service"
@@ -25,12 +26,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 	user, err := h.Svc.Register(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		response.Fail(c, http.StatusInternalServerError, errcode.ErrInternal, err.Error())
 		return
 	}
 	response.OK(c, gin.H{
@@ -46,17 +47,34 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
-	token, err := h.Svc.Login(c.Request.Context(), req.Email, req.Password)
+	token, refresh, err := h.Svc.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		response.Fail(c, http.StatusInternalServerError, errcode.ErrInternal, err.Error())
 		return
 	}
 	response.OK(c, gin.H{
-		"token": token,
+		"token":   token,
+		"refresh": refresh,
 	})
+}
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
+		return
+	}
+	token, err := h.Svc.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		response.Fail(c, http.StatusUnauthorized, errcode.ErrUnauthorized, err.Error())
+		return
+	}
+	response.OK(c, gin.H{"token": token})
 }
 
 type ProductHandler struct{ Svc *service.CatalogService }
@@ -69,13 +87,13 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		Stock int    `json:"stock" binding:"gte=0"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 
 	p, err := h.Svc.CreateProduct(c.Request.Context(), req.Name, req.Price, req.Stock)
 	if err != nil {
-		response.Fail(c, http.StatusBadRequest, 40003, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 	response.OK(c, p)
@@ -85,12 +103,12 @@ func (h *ProductHandler) Get(c *gin.Context) {
 	// TODO(3.1): path :id → Svc.GetProduct
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 	product, err := h.Svc.GetProduct(c.Request.Context(), uint(id))
 	if err != nil {
-		response.Fail(c, http.StatusNotFound, 40401, err.Error())
+		response.Fail(c, http.StatusNotFound, errcode.ErrNotFound, err.Error())
 		return
 	}
 	response.OK(c, product)
@@ -102,7 +120,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	list, err := h.Svc.ListProducts(c.Request.Context(), page, size)
 	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		response.Fail(c, http.StatusInternalServerError, errcode.ErrInternal, err.Error())
 		return
 	}
 	response.OK(c, list)
@@ -120,11 +138,11 @@ func (h *CartHandler) Add(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 	if err := h.Svc.Add(c.Request.Context(), userId, req.ProductID, req.Quantity); err != nil {
-		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		response.Fail(c, http.StatusInternalServerError, errcode.ErrInternal, err.Error())
 		return
 	}
 	response.OK(c, gin.H{"ok": true})
@@ -142,7 +160,7 @@ func (h *OrderHandler) Place(c *gin.Context) {
 		} `json:"items" binding:"required,min=1"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, err.Error())
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, err.Error())
 		return
 	}
 
@@ -155,7 +173,7 @@ func (h *OrderHandler) Place(c *gin.Context) {
 	}
 	o, err := h.Svc.PlaceOrder(c.Request.Context(), userId, items)
 	if err != nil {
-		response.Fail(c, http.StatusInternalServerError, 50001, err.Error())
+		response.Fail(c, http.StatusInternalServerError, errcode.ErrInternal, err.Error())
 		return
 	}
 	response.OK(c, o)
@@ -170,7 +188,7 @@ func (h *OrderHandler) List(c *gin.Context) {
 
 	list, err := h.Svc.ListOrders(c.Request.Context(), userId, status, page, pageSize)
 	if err != nil {
-		response.Fail(c, http.StatusNotImplemented, 50001, "order not found")
+		response.Fail(c, http.StatusNotImplemented, errcode.ErrNotImplemented, "order not found")
 		return
 	}
 
@@ -183,7 +201,7 @@ func (h *OrderHandler) Transition(c *gin.Context) {
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Fail(c, http.StatusBadRequest, 40001, "Invalid id")
+		response.Fail(c, http.StatusBadRequest, errcode.ErrBadRequest, "Invalid id")
 		return
 	}
 
@@ -191,12 +209,12 @@ func (h *OrderHandler) Transition(c *gin.Context) {
 		Status model.OrderStatus `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, http.StatusForbidden, 40001, err.Error())
+		response.Fail(c, http.StatusForbidden, errcode.ErrForbidden, err.Error())
 		return
 	}
 
 	if err := h.Svc.Transition(c.Request.Context(), userId, uint(id), req.Status); err != nil {
-		response.Fail(c, http.StatusForbidden, 40301, err.Error())
+		response.Fail(c, http.StatusForbidden, errcode.ErrForbidden, err.Error())
 		return
 	}
 

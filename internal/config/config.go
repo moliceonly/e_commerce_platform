@@ -6,11 +6,11 @@ import (
 
 // Config 应用配置（3.1：env 区分 local/staging/prod）。
 type Config struct {
-	AppEnv    string
-	HTTPAddr  string
-	MySQLDSN  string
-	RedisAddr string
-	JWTSecret string
+	AppEnv    string `mapstructure:"app_env"`
+	HTTPAddr  string `mapstructure:"http_addr"`
+	MySQLDSN  string `mapstructure:"mysql_dsn"`
+	RedisAddr string `mapstructure:"redis_addr"`
+	JWTSecret string `mapstructure:"jwt_secret"`
 }
 
 // Load 从环境变量读取；缺省给本地练习默认值。
