@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"e_commerce_platform/internal/metrics"
 	"e_commerce_platform/internal/middleware"
+	"e_commerce_platform/internal/observability"
 	"e_commerce_platform/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -11,12 +13,13 @@ import (
 
 // Deps 路由装配依赖（handler → service，禁止 handler 直连 DB）。
 type Deps struct {
-	JWTSecret string
-	Auth      *service.AuthService
-	Catalog   *service.CatalogService
-	Cart      *service.CartService
-	Order     *service.OrderService
-	Upload    *service.UploadService
+	JWTSecret   string
+	Auth        *service.AuthService
+	Catalog     *service.CatalogService
+	Cart        *service.CartService
+	Order       *service.OrderService
+	Upload      *service.UploadService
+	EnablePprof bool
 }
 
 // NewRouter 注册路由分组。先保证 /healthz；其余自己挂。
@@ -26,8 +29,9 @@ func NewRouter(d Deps) *gin.Engine {
 	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
 	r.Use(middleware.CORS([]string{"http://localhost:3000"}))
-	// TODO(H4): r.Use(metrics.Middleware()) ; metrics.Register(r)
-	// TODO(H4): observability.MountPprof(r, cfg.AppEnv != "prod")
+	r.Use(metrics.Middleware())
+	metrics.Register(r)
+	observability.MountPprof(r, d.EnablePprof)
 
 	r.GET("/healthz", Healthz)
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

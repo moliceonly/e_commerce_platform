@@ -77,12 +77,13 @@ func main() {
 	uploadSvc := &service.UploadService{Dir: "data/uploads", BaseURL: "http://127.0.0.1:8080/static"}
 
 	r := handler.NewRouter(handler.Deps{
-		JWTSecret: cfg.JWTSecret,
-		Catalog:   catalogSvc,
-		Cart:      cartSvc,
-		Order:     orderSvc,
-		Auth:      authSvc,
-		Upload:    uploadSvc,
+		JWTSecret:   cfg.JWTSecret,
+		Catalog:     catalogSvc,
+		Cart:        cartSvc,
+		Order:       orderSvc,
+		Auth:        authSvc,
+		Upload:      uploadSvc,
+		EnablePprof: cfg.AppEnv != "prod",
 	})
 
 	log.Printf("listening on %s env=%s", cfg.HTTPAddr, cfg.AppEnv)
@@ -97,7 +98,11 @@ func main() {
 	defer jobs.Stop()
 
 	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: r}
-	go srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Printf("listen: %v", err)
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -105,5 +110,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("shutdown: %v", err)
+	}
 }

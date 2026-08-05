@@ -1,18 +1,15 @@
-# 阶段 H · 3.4 golangci-lint 骨架
-# 安装：https://golangci-lint.run/welcome/install/
-# 运行：golangci-lint run   或  make lint
-
-run:
-  timeout: 5m
-
+version: "2"
 linters:
-  enable:
-    - errcheck
-    - govet
-    - staticcheck
-    - unused
-    # TODO(H4): 按需打开 revive / gofmt / misspell 等
-
-issues:
-  exclude-use-default: false
-  # TODO(H4): 临时 exclude 路径或规则，最终应清零
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

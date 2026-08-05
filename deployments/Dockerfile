@@ -1,5 +1,5 @@
 # 多阶段构建（基础镜像走 DaoCloud 代理，避免直连 Docker Hub 超时）
-FROM docker.m.daocloud.io/library/golang:1.24-alpine AS build
+FROM docker.m.daocloud.io/library/golang:1.25-alpine AS build
 WORKDIR /src
 ENV GOPROXY=https://goproxy.cn,direct
 RUN apk add --no-cache git

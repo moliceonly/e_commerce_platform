@@ -366,7 +366,7 @@ func (s *OrderService) Transition(ctx context.Context, userID, orderID uint, to 
 
 	if order.UserID != userID {
 		applog.FromContext(ctx).Warn("transition forbidden", "user_id", userID, "order_belong_user_id", order.UserID)
-		return fmt.Errorf("User forbidden")
+		return fmt.Errorf("user forbidden")
 	}
 
 	from, ok := order.Status, false
@@ -445,13 +445,13 @@ func (s *UploadService) SaveAvatar(ctx context.Context, userID uint, fh *multipa
 	if err != nil {
 		return "", err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	out, err := os.Create(dst)
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, src); err != nil {
 		return "", err
