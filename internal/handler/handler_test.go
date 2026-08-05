@@ -122,7 +122,7 @@ func TestAllRoutes(t *testing.T) {
 		t.Fatalf("register code=%d msg=%s", reg.Code, reg.Message)
 	}
 
-	// POST /api/v1/auth/login
+	// POST /api/v1/auth/login（普通 user）
 	w = doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", gin.H{
 		"email": email, "password": pass,
 	})
@@ -132,12 +132,46 @@ func TestAllRoutes(t *testing.T) {
 	login := decodeOK(t, w)
 	m, _ := login.Data.(map[string]any)
 	token, _ := m["token"].(string)
+	refresh, _ := m["refresh"].(string)
 	if token == "" {
 		t.Fatalf("empty token body=%s", w.Body.String())
 	}
 
-	// POST /api/v1/products
-	w = doJSON(t, r, http.MethodPost, "/api/v1/products", "", gin.H{
+	// user 创建商品 → 403
+	w = doJSON(t, r, http.MethodPost, "/api/v1/products", token, gin.H{
+		"name": "handler-ut", "price": 9900, "stock": 20,
+	})
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("user create want 403 got %d body=%s", w.Code, w.Body.String())
+	}
+
+	// 提权 admin 后重新登录（JWT 内 role 才会变）
+	db := openTestDB(t)
+	if err := db.Model(&model.User{}).Where("email = ?", email).Update("role", "admin").Error; err != nil {
+		t.Fatal(err)
+	}
+	w = doJSON(t, r, http.MethodPost, "/api/v1/auth/login", "", gin.H{
+		"email": email, "password": pass,
+	})
+	login = decodeOK(t, w)
+	m, _ = login.Data.(map[string]any)
+	token, _ = m["token"].(string)
+	if token == "" {
+		t.Fatal("empty admin token")
+	}
+
+	// refresh 换发 access
+	if refresh != "" {
+		w = doJSON(t, r, http.MethodPost, "/api/v1/auth/refresh", "", gin.H{
+			"refresh_token": refresh,
+		})
+		if w.Code != http.StatusOK {
+			t.Fatalf("refresh status=%d body=%s", w.Code, w.Body.String())
+		}
+	}
+
+	// POST /api/v1/products（admin）
+	w = doJSON(t, r, http.MethodPost, "/api/v1/products", token, gin.H{
 		"name": "handler-ut", "price": 9900, "stock": 20,
 	})
 	if w.Code != http.StatusOK {

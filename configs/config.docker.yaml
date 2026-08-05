@@ -1,0 +1,6 @@
+# Compose / 容器内默认配置（密钥与 DSN 由 compose environment 覆盖）
+app_env: docker
+http_addr: ":8080"
+mysql_dsn: "trainer:Train2026Lib!@tcp(mysql:3306)/training_lib?charset=utf8mb4&parseTime=True&loc=Local"
+redis_addr: "redis:6379"
+jwt_secret: "compose-dev-secret"

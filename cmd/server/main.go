@@ -1,3 +1,12 @@
+// @title           e_commerce_platform API
+// @version         0.1.0
+// @description     电商训练项目 API（阶段 H · OpenAPI / swag）
+// @host            127.0.0.1:8080
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description     填写 `Bearer <access_token>`
 package main
 
 import (
@@ -13,6 +22,7 @@ import (
 	"e_commerce_platform/internal/cache"
 	"e_commerce_platform/internal/config"
 	"e_commerce_platform/internal/handler"
+	"e_commerce_platform/internal/job"
 	"e_commerce_platform/internal/repository"
 	"e_commerce_platform/internal/service"
 
@@ -20,6 +30,8 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	_ "e_commerce_platform/docs"
 )
 
 // 入口：读配置 → 组装依赖 → 起 HTTP。
@@ -46,7 +58,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO(G): rdb, err := cache.NewRedis(cfg.RedisAddr)；失败则 log.Fatal 或降级 nil
 	rdb, err := cache.NewRedis(cfg.RedisAddr)
 	if err != nil {
 		log.Fatal(err)
@@ -63,6 +74,7 @@ func main() {
 	cartSvc := &service.CartService{Carts: &cartRepo, Products: &productRepo, Cache: rdb}
 	orderSvc := &service.OrderService{DB: db, Products: &productRepo, Carts: &cartRepo, Orders: &orderRepo, Cache: rdb}
 	authSvc := &service.AuthService{Users: &userRepo, JWTSecret: cfg.JWTSecret, Cache: rdb}
+	uploadSvc := &service.UploadService{Dir: "data/uploads", BaseURL: "http://127.0.0.1:8080/static"}
 
 	r := handler.NewRouter(handler.Deps{
 		JWTSecret: cfg.JWTSecret,
@@ -70,11 +82,19 @@ func main() {
 		Cart:      cartSvc,
 		Order:     orderSvc,
 		Auth:      authSvc,
+		Upload:    uploadSvc,
 	})
 
 	log.Printf("listening on %s env=%s", cfg.HTTPAddr, cfg.AppEnv)
-	// TODO(H3): jobs := &job.Runner{Interval: time.Minute}; jobs.Start(context.Background())
-	// TODO(H3): defer jobs.Stop()
+
+	jobs := &job.Runner{
+		Timeout: 30 * time.Minute,
+		Tick:    time.Minute,
+		Orders:  &orderRepo,
+		DB:      db,
+	}
+	jobs.Start(context.Background())
+	defer jobs.Stop()
 
 	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: r}
 	go srv.ListenAndServe()
@@ -86,5 +106,4 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(ctx)
-
 }

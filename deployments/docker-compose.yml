@@ -32,6 +32,9 @@ services:
       JWT_SECRET: "compose-dev-secret"
     ports:
       - "8080:8080"
+    volumes:
+      # 头像等上传文件持久化（容器工作目录 /app）
+      - ../data/uploads:/app/data/uploads
     depends_on:
       mysql:
         condition: service_healthy

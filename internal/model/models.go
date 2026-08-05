@@ -20,7 +20,7 @@ type Product struct {
 	Name    string `gorm:"size:128"`
 	Price   int64  // 分
 	Stock   int
-	Version int    `gorm:"default:1"` // 乐观锁用
+	Version int `gorm:"default:1"` // 乐观锁用
 }
 
 // CartItem 购物车行。
@@ -48,6 +48,7 @@ type Order struct {
 	UserID  uint        `gorm:"index"`
 	Status  OrderStatus `gorm:"size:32;index"`
 	Total   int64       // 分
+	OrderAt *time.Time
 	PaidAt  *time.Time
 	ShipAt  *time.Time
 	DoneAt  *time.Time

@@ -5,6 +5,8 @@ import (
 	"e_commerce_platform/internal/service"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Deps 路由装配依赖（handler → service，禁止 handler 直连 DB）。
@@ -14,6 +16,7 @@ type Deps struct {
 	Catalog   *service.CatalogService
 	Cart      *service.CartService
 	Order     *service.OrderService
+	Upload    *service.UploadService
 }
 
 // NewRouter 注册路由分组。先保证 /healthz；其余自己挂。
@@ -22,24 +25,22 @@ func NewRouter(d Deps) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.AccessLog())
-	r.Use(middleware.RequireRole())
 	r.Use(middleware.CORS([]string{"http://localhost:3000"}))
 	// TODO(H4): r.Use(metrics.Middleware()) ; metrics.Register(r)
 	// TODO(H4): observability.MountPprof(r, cfg.AppEnv != "prod")
 
 	r.GET("/healthz", Healthz)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	prodH := &ProductHandler{Svc: d.Catalog}
 	cartH := &CartHandler{Svc: d.Cart}
 	orderH := &OrderHandler{Svc: d.Order}
 	authH := &AuthHandler{Svc: d.Auth}
-	_ = &AuthRefreshHandler{JWTSecret: d.JWTSecret} // TODO(H2): 挂到路由
-	_ = &UploadHandler{}                            // TODO(H3): 注入 UploadService 并挂路由
+	uploadH := &UploadHandler{Svc: d.Upload}
 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/products", prodH.List)
 		v1.GET("/products/:id", prodH.Get)
-		v1.POST("/products", prodH.Create)
 		v1.POST("/products", middleware.JWTAuth(d.JWTSecret), middleware.RequireRole("admin"), prodH.Create)
 		v1.POST("/auth/register", authH.Register)
 		v1.POST("/auth/login", authH.Login)
@@ -53,9 +54,9 @@ func NewRouter(d Deps) *gin.Engine {
 		authz.POST("/orders", orderH.Place)
 		authz.POST("/orders/:id/transition", orderH.Transition)
 		authz.GET("/orders", orderH.List)
-		// TODO(H3): authz.POST("/me/avatar", uploadH.Avatar)
+		authz.POST("/me/avatar", uploadH.Avatar)
 	}
-	// TODO(H3): r.Static("/static", "data/uploads")
+	r.Static("/static", "data/uploads")
 
 	return r
 }

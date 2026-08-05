@@ -12,6 +12,9 @@ FROM docker.m.daocloud.io/library/alpine:3.20
 WORKDIR /app
 RUN apk add --no-cache ca-certificates wget
 COPY --from=build /out/server /app/server
+# LoadYAML 读相对路径 configs/config.{APP_ENV}.yaml（compose 使用 APP_ENV=docker）
+COPY configs/config.docker.yaml /app/configs/
+RUN mkdir -p /app/data/uploads
 EXPOSE 8080
 HEALTHCHECK CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
 ENTRYPOINT ["/app/server"]

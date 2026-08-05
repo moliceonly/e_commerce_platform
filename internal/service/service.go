@@ -4,7 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"e_commerce_platform/internal/applog"
@@ -310,11 +315,12 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uint, items []Orde
 			})
 			productIDs = append(productIDs, item.ProductID)
 		}
-
+		orderTime := time.Now()
 		order = &model.Order{
-			UserID: userID,
-			Status: model.OrderPending,
-			Total:  total,
+			UserID:  userID,
+			Status:  model.OrderPending,
+			Total:   total,
+			OrderAt: &orderTime,
 		}
 		if err := s.Orders.CreateWithItems(ctx, tx, order, orderItems); err != nil {
 			return err
@@ -392,4 +398,64 @@ func (s *OrderService) ListOrders(ctx context.Context, userID uint, status strin
 		return nil, err
 	}
 	return q, nil
+}
+
+// UploadService 本地文件上传（阶段 H · 3.3）。
+// 进阶可换成 MinIO/OSS，对外仍返回 URL。
+type UploadService struct {
+	Dir     string // 如 data/uploads
+	BaseURL string // 如 http://127.0.0.1:8080/static
+}
+
+const maxSize = 2 << 20
+
+// SaveAvatar 保存用户头像，返回可访问 URL。
+func (s *UploadService) SaveAvatar(ctx context.Context, userID uint, fh *multipart.FileHeader) (url string, err error) {
+	// TODO(H3):
+	//  1. 校验大小/扩展名（jpg/png）
+	//  2. 存到 s.Dir/{userID}_avatar.ext
+	//  3. 返回 s.BaseURL + "/" + filename
+	_ = ctx
+	_ = userID
+	_ = fh
+	if fh == nil {
+		return "", fmt.Errorf("empty file")
+	}
+
+	if fh.Size <= 0 || fh.Size > maxSize {
+		return "", fmt.Errorf("invalid file size")
+	}
+
+	ext := strings.ToLower(filepath.Ext(fh.Filename))
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+		return "", fmt.Errorf("invalid ext")
+	}
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
+
+	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
+		return "", err
+	}
+
+	filename := fmt.Sprintf("%d_avatar%s", userID, ext)
+	dst := filepath.Join(s.Dir, filename)
+
+	src, err := fh.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, src); err != nil {
+		return "", err
+	}
+
+	return strings.TrimRight(s.BaseURL, "/") + "/" + filename, nil
 }

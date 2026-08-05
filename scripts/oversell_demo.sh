@@ -7,11 +7,17 @@ PASSWORD="${PASSWORD:-123456}"
 STOCK="${STOCK:-30}"
 QTY="${QTY:-1}"
 N="${CONCURRENCY:-50}"
+COMPOSE_FILE="${COMPOSE_FILE:-deployments/docker-compose.yml}"
 
 echo "==> register/login"
 curl -sS -X POST "$BASE/api/v1/auth/register" \
   -H 'Content-Type: application/json' \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" >/dev/null || true
+
+echo "==> promote to admin (create product requires RequireRole admin)"
+sudo docker compose -f "$COMPOSE_FILE" exec -T mysql \
+  mysql -utrainer -p'Train2026Lib!' training_lib -e \
+  "UPDATE users SET role='admin' WHERE email='${EMAIL}';" >/dev/null
 
 TOKEN="$(
   curl -sS -X POST "$BASE/api/v1/auth/login" \
@@ -27,12 +33,13 @@ fi
 echo "==> create product stock=$STOCK"
 PRODUCT_ID="$(
   curl -sS -X POST "$BASE/api/v1/products" \
+    -H "Authorization: Bearer $TOKEN" \
     -H 'Content-Type: application/json' \
     -d "{\"name\":\"oversell-demo\",\"price\":100,\"stock\":$STOCK}" \
   | jq -r '.data.ID // .data.id'
 )"
 if [[ -z "$PRODUCT_ID" || "$PRODUCT_ID" == "null" ]]; then
-  echo "create product failed" >&2
+  echo "create product failed (need admin token)" >&2
   exit 1
 fi
 echo "    PRODUCT_ID=$PRODUCT_ID  TOKEN ok"

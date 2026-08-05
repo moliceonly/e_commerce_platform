@@ -1,0 +1,423 @@
+basePath: /
+definitions:
+  e_commerce_platform_internal_model.OrderStatus:
+    enum:
+    - pending
+    - paid
+    - shipped
+    - done
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - OrderPending
+    - OrderPaid
+    - OrderShipped
+    - OrderDone
+    - OrderCancelled
+  e_commerce_platform_internal_response.Body:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  internal_handler.AddCartItemRequest:
+    properties:
+      product_id:
+        type: integer
+      quantity:
+        minimum: 1
+        type: integer
+    required:
+    - product_id
+    - quantity
+    type: object
+  internal_handler.CreateProductRequest:
+    properties:
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: integer
+      stock:
+        minimum: 0
+        type: integer
+    required:
+    - name
+    type: object
+  internal_handler.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handler.PlaceOrderItem:
+    properties:
+      product_id:
+        type: integer
+      quantity:
+        minimum: 1
+        type: integer
+    required:
+    - product_id
+    - quantity
+    type: object
+  internal_handler.PlaceOrderRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_handler.PlaceOrderItem'
+        minItems: 1
+        type: array
+    required:
+    - items
+    type: object
+  internal_handler.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  internal_handler.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handler.TransitionRequest:
+    properties:
+      status:
+        $ref: '#/definitions/e_commerce_platform_internal_model.OrderStatus'
+    required:
+    - status
+    type: object
+host: 127.0.0.1:8080
+info:
+  contact: {}
+  description: 电商训练项目 API（阶段 H · OpenAPI / swag）
+  title: e_commerce_platform API
+  version: 0.1.0
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 登录信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 登录
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: refresh_token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 刷新 access token
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 注册信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 注册
+      tags:
+      - auth
+  /api/v1/cart/items:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 购物车项
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.AddCartItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 加入购物车
+      tags:
+      - cart
+  /api/v1/me/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 头像文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 上传头像
+      tags:
+      - user
+  /api/v1/orders:
+    get:
+      parameters:
+      - description: 状态过滤 pending/paid/shipped/done/cancelled
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单列表
+      tags:
+      - orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单行
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.PlaceOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 下单
+      tags:
+      - orders
+  /api/v1/orders/{id}/transition:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 目标状态
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.TransitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单状态流转
+      tags:
+      - orders
+  /api/v1/products:
+    get:
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 商品列表
+      tags:
+      - products
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 商品
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      security:
+      - BearerAuth: []
+      summary: 创建商品
+      tags:
+      - products
+  /api/v1/products/{id}:
+    get:
+      parameters:
+      - description: 商品 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 商品详情
+      tags:
+      - products
+  /healthz:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/e_commerce_platform_internal_response.Body'
+      summary: 探活
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: 填写 `Bearer <access_token>`
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

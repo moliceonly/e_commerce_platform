@@ -134,41 +134,43 @@ sudo docker compose -f deployments/docker-compose.yml --profile test run --rm te
 对照 [`go-web-roadmap.html`](../go-web-roadmap.html) Part 03 知识要点，在 **不推倒 A–G** 的前提下补齐缺口。  
 骨架已生成（函数多返回 `TODO(H)` / 501 / 空实现），按表自己填。建议顺序：**H1 → H2 → H3 → H4 → H5**。
 
-### H1 · 3.1 配置与错误码
+### H1 · 3.1 配置与错误码 ✅
 
 | 状态 | 去哪里实现 | 要做什么 |
 |------|------------|----------|
-| ☐ | `configs/*.yaml` | 补全 local / staging / prod 示例字段 |
-| ☐ | `internal/config/viper.go` → `LoadYAML` | `go get github.com/spf13/viper`；读 yaml，**env 覆盖文件** |
-| ☐ | `cmd/server/main.go` | 可选：`APP_CONFIG` 或按 `APP_ENV` 切到 `LoadYAML` |
-| ☐ | `internal/errcode/errcode.go` | 统一业务错误码常量；handler 逐步改用 |
+| ✅ | `configs/*.yaml` | local / staging / prod（example + 本地 gitignore 副本） |
+| ✅ | `internal/config/viper.go` → `LoadYAML` | viper 读 yaml，env 覆盖 |
+| ✅ | `cmd/server/main.go` | 按 `APP_ENV` 调用 `LoadYAML` |
+| ✅ | `internal/errcode/errcode.go` | 统一业务错误码；handler/middleware 已改用 |
 
-**验收：** 不改代码只换 `configs/config.staging.yaml` + env 覆盖 JWT，进程能读到新值。
+**验收：** `APP_ENV=local|staging` + `JWT_SECRET=...` 能覆盖文件值。
 
-### H2 · 3.2 安全增强（RBAC / CORS / Refresh）
+### H2 · 3.2 安全增强（RBAC / CORS / Refresh）✅
 
 | 状态 | 去哪里实现 | 要做什么 |
 |------|------------|----------|
-| ☐ | `internal/middleware/cors.go` | 按环境放行 Origin；生产勿 `*` + Credential |
-| ☐ | `internal/middleware/rbac.go` → `RequireRole` | JWT 解析后校验 `role`；无权限 403 |
-| ☐ | `middleware.JWTAuth` | `c.Set(CtxRole, claims.Role)`（配合 RBAC） |
-| ☐ | `internal/auth/refresh.go` | 短 access + 长 refresh；`Refresh` 换发 access |
-| ☐ | `handler` / `router` | `POST /auth/refresh`；`POST /products` 可挂 `RequireRole("admin")` |
-| ☐ | （可选）文档笔记 | CSRF / XSS / 密钥不进仓（README 安全小节即可） |
+| ✅ | `internal/middleware/cors.go` | Origin 白名单 + OPTIONS 204 |
+| ✅ | `internal/middleware/rbac.go` → `RequireRole` | 校验 role；403 |
+| ✅ | `middleware.JWTAuth` | `c.Set(CtxRole, claims.Role)` |
+| ✅ | `internal/auth` + `AuthService` | access + refresh；`/auth/refresh` 换发 |
+| ✅ | `handler` / `router` | refresh 路由；`POST /products` 需 admin |
+| ✅ | README 冒烟 / 安全说明 | 见 README「冒烟」与「安全注意」 |
 
-**验收：** 普通 `user` 调创建商品返回 403；admin 成功；refresh 可换新 access。
+**验收：** user 建商品 403；提权 admin 后成功；refresh 可换新 access（命令见 README）。
 
 ### H3 · 3.3 上传 / 异步 / OpenAPI
 
 | 状态 | 去哪里实现　　　　　　　　　　　　　　　　　　　　 | 要做什么　　　　　　　　　　　　　　　　　　　　　　　　　　　 |
 | ------| ----------------------------------------------------| ----------------------------------------------------------------|
-| ☐　　| `internal/service/upload.go` + `handler/upload.go` | multipart 存 `data/uploads/`，返回可访问 URL　　　　　　　　　 |
-| ☐　　| `router`　　　　　　　　　　　　　　　　　　　　　 | `POST /api/v1/me/avatar`（需登录）；`GET /static/*` 或专用下载 |
-| ☐　　| `internal/job/job.go`　　　　　　　　　　　　　　　| 启动后台 goroutine：例如每分钟扫超时未支付订单（可先打日志）　 |
-| ☐　　| `cmd/server/main.go`　　　　　　　　　　　　　　　 | `job.Start(...)`；Shutdown 时 `job.Stop`　　　　　　　　　　　 |
-| ☐　　| `docs/openapi.yaml` 或 swag　　　　　　　　　　　　| 手写 OpenAPI 最小集，或 `swag init` 生成 `/swagger/*`　　　　　|
+| ✅　　| `internal/service` UploadService + `handler` Avatar | multipart 存 `data/uploads/`，返回可访问 URL　　　　　　　　　 |
+| ✅　　| `router`　　　　　　　　　　　　　　　　　　　　　 | `POST /api/v1/me/avatar`（需登录）；`GET /static/*`　　　　　　 |
+| ✅　　| `internal/job/job.go`　　　　　　　　　　　　　　　| ticker 扫超时 pending → `UpdateStatus` 取消；每轮打 job tick　 |
+| ✅　　| `cmd/server/main.go`　　　　　　　　　　　　　　　 | `job.Start`；`defer job.Stop`　　　　　　　　　　　　　　　　　 |
+| ✅　　| swag + `/swagger/*`　　　　　　　　　　　　　　　　| 注解生成 `docs/`；`GET /swagger/index.html`　　　　　　　　　　|
 
 **验收：** 上传头像后能用返回 URL 访问文件；进程日志出现 job tick；Swagger/OpenAPI 能打开或被 raw 查看。
+
+Compose：`data/uploads` 已挂载到容器 `/app/data/uploads`（重启不丢文件）。
 
 ### H4 · 3.4 Lint / Metrics / pprof
 
